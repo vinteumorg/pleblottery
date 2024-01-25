@@ -1,0 +1,6 @@
+[package]
+name = "pleblottery"
+authors = [ "plebhash <plebhash@proton.me>", "Lucas Balieiro <github@lucasbalieiro.dev>" ]
+version = "0.1.0"
+edition = "2021"
+description = "a hashrate aggregator for a pleb-friendly and fully sovereign solo/lottery Bitcoin mining experience"
