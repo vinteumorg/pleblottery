@@ -1,0 +1,3 @@
+[submodule "stratum-message-generator"]
+	path = stratum-message-generator
+	url = ssh://git@github.com/plebhash/stratum-message-generator
