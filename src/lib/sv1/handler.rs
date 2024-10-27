@@ -34,8 +34,9 @@ impl<'a> sv1_api::IsServer<'a> for Sv1Handler {
         vec![set_difficulty_sub, notify_sub]
     }
 
+    // dummy
     fn handle_authorize(&self, _request: &Authorize) -> bool {
-        todo!()
+        true
     }
 
     fn handle_submit(&self, _request: &Submit<'a>) -> bool {
@@ -51,7 +52,7 @@ impl<'a> sv1_api::IsServer<'a> for Sv1Handler {
     }
 
     fn authorize(&mut self, _name: &str) {
-        todo!()
+        // todo!()
     }
 
     // dummy
