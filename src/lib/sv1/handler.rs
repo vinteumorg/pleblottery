@@ -1,4 +1,4 @@
-use sv1_api::client_to_server::{Authorize, Configure, Submit, Subscribe};
+use sv1_api::client_to_server::{Authorize, Configure, Submit};
 use sv1_api::error::Error;
 use sv1_api::server_to_client::VersionRollingParams;
 use sv1_api::utils::{Extranonce, HexU32Be};
@@ -15,8 +15,23 @@ impl<'a> sv1_api::IsServer<'a> for Sv1Handler {
         todo!()
     }
 
-    fn handle_subscribe(&self, _request: &Subscribe) -> Vec<(String, String)> {
-        todo!()
+    // dummy
+    fn handle_subscribe(
+        &self,
+        _request: &sv1_api::client_to_server::Subscribe,
+    ) -> Vec<(String, String)> {
+        tracing::info!("handling mining.subscribe");
+
+        let set_difficulty_sub = (
+            "mining.set_difficulty".to_string(),
+            "ae6812eb4cd7735a302a8a9dd95cf71f".to_string(),
+        );
+        let notify_sub = (
+            "mining.notify".to_string(),
+            "ae6812eb4cd7735a302a8a9dd95cf71f".to_string(),
+        );
+
+        vec![set_difficulty_sub, notify_sub]
     }
 
     fn handle_authorize(&self, _request: &Authorize) -> bool {
@@ -39,16 +54,21 @@ impl<'a> sv1_api::IsServer<'a> for Sv1Handler {
         todo!()
     }
 
+    // dummy
     fn set_extranonce1(&mut self, _extranonce1: Option<Extranonce<'a>>) -> Extranonce<'a> {
-        todo!()
+        let extranonce: Extranonce<'a> =
+            Extranonce::try_from("000000000000000000000000000000010000000000000001")
+                .expect("should always work");
+        extranonce
     }
 
     fn extranonce1(&self) -> Extranonce<'a> {
         todo!()
     }
 
+    // dummy
     fn set_extranonce2_size(&mut self, _extra_nonce2_size: Option<usize>) -> usize {
-        todo!()
+        8
     }
 
     fn extranonce2_size(&self) -> usize {
