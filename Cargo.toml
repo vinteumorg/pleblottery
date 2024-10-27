@@ -5,6 +5,10 @@ version = "0.1.0"
 edition = "2021"
 description = "a hashrate aggregator for a pleb-friendly and fully sovereign solo/lottery Bitcoin mining experience"
 
+[lib]
+name = "pleblottery"
+path = "src/lib/mod.rs"
+
 [dependencies]
 # async
 tokio = { version = "1", features = ["full"] }
@@ -12,3 +16,12 @@ tokio = { version = "1", features = ["full"] }
 # tracing
 tracing = { version = "0.1" }
 tracing-subscriber = { version = "0.3" }
+
+# CLI
+clap = { version = "4.3.14", features = ["env", "default", "derive"]}
+config = { version = "0.13.3", features = ["toml"] }
+serde = "1.0.164"
+serde_json = "1.0.96"
+
+# error handling
+anyhow = "1.0.71"
