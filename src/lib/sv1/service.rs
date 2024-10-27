@@ -49,8 +49,9 @@ impl Sv1Service {
                 match message_reader.next().fuse().await {
                     Some(r) => {
                         match r {
-                            Ok(message) => {
-                                tracing::info!("received sv1 message from {} {}", addr, message);
+                            Ok(message_str) => {
+                                let sv1_message: sv1_api::json_rpc::Message = serde_json::from_str(&message_str).expect("failed to parse JSON from sv1 message string");
+                                tracing::info!("received sv1 message from: {} | {:?}", addr, sv1_message);
                             },
                             Err(e) => {
                                 panic!("error reading TcpStream: {}", e);

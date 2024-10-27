@@ -27,3 +27,6 @@ serde_json = "1.0.96"
 
 # error handling
 anyhow = "1.0.71"
+
+# Stratum V1
+sv1_api = "1.0.1"
