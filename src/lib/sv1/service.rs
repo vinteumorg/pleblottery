@@ -19,8 +19,8 @@ pub struct Sv1Service {
 
 impl Sv1Service {
     pub async fn new(config: Sv1Config) -> anyhow::Result<Self> {
-        let listen_host = config.host;
-        let listen_port = config.port;
+        let listen_host = config.listen_host;
+        let listen_port = config.listen_port;
         let listen_addr = format!("{}:{}", listen_host, listen_port);
         let listener = async_std::net::TcpListener::bind(listen_addr).await?;
 
