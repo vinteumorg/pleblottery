@@ -1,3 +1,4 @@
+use super::bitcoin::SoloHeaderFields;
 use sv1_api::client_to_server::{Authorize, Configure, Submit};
 use sv1_api::error::Error;
 use sv1_api::server_to_client::VersionRollingParams;
@@ -5,7 +6,19 @@ use sv1_api::utils::{Extranonce, HexU32Be};
 use sv1_api::Message;
 
 #[derive(Clone)]
-pub struct Sv1Handler;
+pub struct Sv1Handler {
+    pub solo_header_fields: SoloHeaderFields,
+    pub is_authorized: bool,
+}
+
+impl Sv1Handler {
+    pub fn new() -> Self {
+        Self {
+            solo_header_fields: SoloHeaderFields::new(),
+            is_authorized: false,
+        }
+    }
+}
 
 impl<'a> sv1_api::IsServer<'a> for Sv1Handler {
     fn handle_configure(
@@ -34,9 +47,8 @@ impl<'a> sv1_api::IsServer<'a> for Sv1Handler {
         vec![set_difficulty_sub, notify_sub]
     }
 
-    // dummy
-    fn handle_authorize(&self, _request: &Authorize) -> bool {
-        true
+    fn handle_authorize(&self, request: &Authorize) -> bool {
+        !self.is_authorized(&request.name)
     }
 
     fn handle_submit(&self, _request: &Submit<'a>) -> bool {
@@ -48,11 +60,11 @@ impl<'a> sv1_api::IsServer<'a> for Sv1Handler {
     }
 
     fn is_authorized(&self, _name: &str) -> bool {
-        todo!()
+        self.is_authorized
     }
 
     fn authorize(&mut self, _name: &str) {
-        // todo!()
+        self.is_authorized = true;
     }
 
     // dummy
