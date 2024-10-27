@@ -103,7 +103,7 @@ impl Sv1Service {
                                 .expect("should always work");
 
                         tracing::info!(
-                            "sending sv1 mining.set_difficulty to: {} | {:?}",
+                            "sending sv1 mining.set_difficulty to: {} | {}",
                             addr,
                             sv1_set_difficulty_msg_str
                         );
@@ -142,7 +142,7 @@ impl Sv1Service {
                             .expect("should always convert to string");
 
                         tracing::info!(
-                            "sending sv1 mining.notify to: {} | {:?}",
+                            "sending sv1 mining.notify to: {} | {}",
                             addr,
                             sv1_notify_msg_str
                         );
@@ -185,7 +185,7 @@ impl Sv1Service {
                                 .expect("should always convert to string");
 
                             tracing::info!(
-                                "sending sv1 response to: {} | {:?}",
+                                "sending sv1 response to: {} | {}",
                                 addr,
                                 sv1_response_str
                             );
