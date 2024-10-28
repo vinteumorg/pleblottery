@@ -97,10 +97,10 @@ impl Sv1Service {
     async fn tcp_writer_task(mut tcp_writer: TcpStream, mut writer_rx: mpsc::Receiver<String>) {
         while let Some(message) = writer_rx.recv().await {
             let message_bytes = message.as_bytes();
-            tcp_writer
-                .write_all(message_bytes)
-                .await
-                .expect("should always send response over TcpStream writer");
+            match tcp_writer.write_all(message_bytes).await {
+                Ok(_) => {}
+                Err(_) => break,
+            }
         }
     }
 
@@ -135,59 +135,63 @@ impl Sv1Service {
                     let sv1_handler = sv1_handler_clone.lock().await;
 
                     if sv1_handler.is_authorized {
-                        let sv1_set_difficulty =
-                            sv1_api::methods::server_to_client::SetDifficulty {
-                                value: 0.00002328342918345014,
+                        if !writer_tx_clone.is_closed() {
+                            let sv1_set_difficulty =
+                                sv1_api::methods::server_to_client::SetDifficulty {
+                                    value: 0.00002328342918345014,
+                                };
+
+                            let sv1_set_difficulty_msg: sv1_api::json_rpc::Message =
+                                sv1_set_difficulty.into();
+
+                            let sv1_set_difficulty_msg_str =
+                                serde_json::to_string(&sv1_set_difficulty_msg)
+                                    .expect("should always work");
+
+                            tracing::info!(
+                                "sending sv1 mining.set_difficulty to: {} | {}",
+                                addr,
+                                sv1_set_difficulty_msg_str
+                            );
+
+                            let sv1_set_difficulty_msg_str_fmt =
+                                format!("{}\n", sv1_set_difficulty_msg_str);
+                            writer_tx_clone
+                                .send(sv1_set_difficulty_msg_str_fmt)
+                                .await
+                                .expect("should always work");
+                        }
+
+                        if !writer_tx_clone.is_closed() {
+                            let sv1_notify = sv1_api::methods::server_to_client::Notify {
+                                job_id: "0".to_string(),
+                                prev_hash: sv1_handler.template.prevhash.clone(),
+                                coin_base1: sv1_handler.template.coinbase_prefix.clone(),
+                                coin_base2: sv1_handler.template.coinbase_suffix.clone(),
+                                merkle_branch: sv1_handler.template.merkle_branches.clone(),
+                                version: sv1_handler.template.version.clone(),
+                                bits: sv1_handler.template.bits.clone(),
+                                time: sv1_handler.template.time.clone(),
+                                clean_jobs: false,
                             };
 
-                        let sv1_set_difficulty_msg: sv1_api::json_rpc::Message =
-                            sv1_set_difficulty.into();
+                            let sv1_notify_msg: sv1_api::json_rpc::Message = sv1_notify.into();
 
-                        let sv1_set_difficulty_msg_str =
-                            serde_json::to_string(&sv1_set_difficulty_msg)
+                            let sv1_notify_msg_str = serde_json::to_string(&sv1_notify_msg)
+                                .expect("should always convert to string");
+
+                            tracing::info!(
+                                "sending sv1 mining.notify to: {} | {}",
+                                addr,
+                                sv1_notify_msg_str
+                            );
+
+                            let sv1_notify_msg_str_fmt = format!("{}\n", sv1_notify_msg_str);
+                            writer_tx_clone
+                                .send(sv1_notify_msg_str_fmt)
+                                .await
                                 .expect("should always work");
-
-                        tracing::info!(
-                            "sending sv1 mining.set_difficulty to: {} | {}",
-                            addr,
-                            sv1_set_difficulty_msg_str
-                        );
-
-                        let sv1_set_difficulty_msg_str_fmt =
-                            format!("{}\n", sv1_set_difficulty_msg_str);
-                        writer_tx_clone
-                            .send(sv1_set_difficulty_msg_str_fmt)
-                            .await
-                            .expect("should always work");
-
-                        let sv1_notify = sv1_api::methods::server_to_client::Notify {
-                            job_id: "0".to_string(),
-                            prev_hash: sv1_handler.template.prevhash.clone(),
-                            coin_base1: sv1_handler.template.coinbase_prefix.clone(),
-                            coin_base2: sv1_handler.template.coinbase_suffix.clone(),
-                            merkle_branch: sv1_handler.template.merkle_branches.clone(),
-                            version: sv1_handler.template.version.clone(),
-                            bits: sv1_handler.template.bits.clone(),
-                            time: sv1_handler.template.time.clone(),
-                            clean_jobs: false,
-                        };
-
-                        let sv1_notify_msg: sv1_api::json_rpc::Message = sv1_notify.into();
-
-                        let sv1_notify_msg_str = serde_json::to_string(&sv1_notify_msg)
-                            .expect("should always convert to string");
-
-                        tracing::info!(
-                            "sending sv1 mining.notify to: {} | {}",
-                            addr,
-                            sv1_notify_msg_str
-                        );
-
-                        let sv1_notify_msg_str_fmt = format!("{}\n", sv1_notify_msg_str);
-                        writer_tx_clone
-                            .send(sv1_notify_msg_str_fmt)
-                            .await
-                            .expect("should always work");
+                        }
                     };
                 }
             });
