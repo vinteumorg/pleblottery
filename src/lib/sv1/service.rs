@@ -1,3 +1,4 @@
+use super::bitcoin::gbt;
 use super::config::Sv1Config;
 use super::handler::Sv1Handler;
 use async_std::io::BufReader;
@@ -5,16 +6,18 @@ use async_std::net::TcpStream;
 use async_std::prelude::*;
 use async_std::stream::StreamExt;
 use futures::future::FutureExt;
-use std::sync::{Arc};
-use tokio::sync::Mutex;
+use std::sync::Arc;
 use sv1_api::IsServer;
 use tokio::sync::mpsc;
+use tokio::sync::Mutex;
 
 const MAX_LINE_LENGTH: usize = 2_usize.pow(16);
 
 pub struct Sv1Service {
     listener: async_std::net::TcpListener,
     sv1_handler: Arc<Mutex<Sv1Handler>>,
+    bitcoin_rpc_client: bitcoincore_rpc::Client,
+    getblocktemplate_interval: f32,
 }
 
 impl Sv1Service {
@@ -30,22 +33,62 @@ impl Sv1Service {
             listen_port
         );
 
-        let sv1_handler = Sv1Handler::new();
+        let sv1_handler = Sv1Handler::new(
+            config.bitcoin_network,
+            config.solo_miner_signature,
+            config.solo_miner_address,
+        )?;
+
+        let bitcoin_rpc_url = format!("{}:{}", config.bitcoin_rpc_host, config.bitcoin_rpc_port);
+        let bitcoin_rpc_client = bitcoincore_rpc::Client::new(
+            &bitcoin_rpc_url,
+            bitcoincore_rpc::Auth::UserPass(config.bitcoin_rpc_user, config.bitcoin_rpc_pass),
+        )?;
 
         Ok(Self {
             listener,
             sv1_handler: Arc::new(Mutex::new(sv1_handler)),
+            bitcoin_rpc_client,
+            getblocktemplate_interval: config.getblocktemplate_interval,
         })
     }
 
+    async fn block_template_updater(
+        bitcoin_rpc_client: bitcoincore_rpc::Client,
+        getblocktemplate_interval: f32,
+        sv1_handler: Arc<Mutex<Sv1Handler>>,
+    ) {
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs_f32(
+                getblocktemplate_interval,
+            ));
+            tracing::debug!("sending getblocktemplate RPC to Bitcoin Node");
+
+            let gbt_result = gbt(&bitcoin_rpc_client).await;
+
+            let mut sv1_handler = sv1_handler.lock().await;
+            sv1_handler.update_template(gbt_result);
+        }
+    }
+
     pub fn serve(self) -> tokio::task::JoinHandle<anyhow::Result<()>> {
+        let sv1_handler_clone = self.sv1_handler.clone();
         let handle = tokio::task::spawn(async move {
             while let Ok((stream, addr)) = self.listener.accept().await {
                 tracing::info!("established sv1 connection: {}", addr);
 
-                Self::handle_tcp_stream(stream, addr, self.sv1_handler.clone());
+                Self::handle_tcp_stream(stream, addr, sv1_handler_clone.clone());
             }
             Ok(())
+        });
+
+        tokio::task::spawn(async move {
+            Self::block_template_updater(
+                self.bitcoin_rpc_client,
+                self.getblocktemplate_interval,
+                self.sv1_handler,
+            )
+            .await;
         });
 
         handle
@@ -117,22 +160,13 @@ impl Sv1Service {
 
                         let sv1_notify = sv1_api::methods::server_to_client::Notify {
                             job_id: "0".to_string(),
-                            prev_hash: sv1_handler.solo_header_fields.prevhash.clone(),
-                            coin_base1: sv1_handler
-                                .solo_header_fields
-                                .coinbase_prefix
-                                .clone(),
-                            coin_base2: sv1_handler
-                                .solo_header_fields
-                                .coinbase_suffix
-                                .clone(),
-                            merkle_branch: sv1_handler
-                                .solo_header_fields
-                                .merkle_branches
-                                .clone(),
-                            version: sv1_handler.solo_header_fields.version.clone(),
-                            bits: sv1_handler.solo_header_fields.bits.clone(),
-                            time: sv1_handler.solo_header_fields.time.clone(),
+                            prev_hash: sv1_handler.template.prevhash.clone(),
+                            coin_base1: sv1_handler.template.coinbase_prefix.clone(),
+                            coin_base2: sv1_handler.template.coinbase_suffix.clone(),
+                            merkle_branch: sv1_handler.template.merkle_branches.clone(),
+                            version: sv1_handler.template.version.clone(),
+                            bits: sv1_handler.template.bits.clone(),
+                            time: sv1_handler.template.time.clone(),
                             clean_jobs: false,
                         };
 
@@ -192,7 +226,10 @@ impl Sv1Service {
 
                             let sv1_response_str_fmt = format!("{}\n", sv1_response_str);
 
-                            writer_tx.send(sv1_response_str_fmt).await.expect("should always work");
+                            writer_tx
+                                .send(sv1_response_str_fmt)
+                                .await
+                                .expect("should always work");
                         }
                         Err(e) => {
                             panic!("error reading TcpStream: {}", e);

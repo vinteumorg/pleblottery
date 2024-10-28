@@ -1,4 +1,5 @@
-use super::bitcoin::SoloHeaderFields;
+use super::bitcoin::Template;
+use bitcoincore_rpc_json::GetBlockTemplateResult;
 use sv1_api::client_to_server::{Authorize, Configure, Submit};
 use sv1_api::error::Error;
 use sv1_api::server_to_client::VersionRollingParams;
@@ -7,16 +8,24 @@ use sv1_api::Message;
 
 #[derive(Clone)]
 pub struct Sv1Handler {
-    pub solo_header_fields: SoloHeaderFields,
+    pub template: Template,
     pub is_authorized: bool,
 }
 
 impl Sv1Handler {
-    pub fn new() -> Self {
-        Self {
-            solo_header_fields: SoloHeaderFields::new(),
+    pub fn new(
+        bitcoin_network: String,
+        solo_miner_signature: String,
+        solo_miner_address: String,
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
+            template: Template::new(bitcoin_network, solo_miner_signature, solo_miner_address)?,
             is_authorized: false,
-        }
+        })
+    }
+
+    pub fn update_template(&mut self, gbt_result: GetBlockTemplateResult) {
+        self.template.update(gbt_result);
     }
 }
 

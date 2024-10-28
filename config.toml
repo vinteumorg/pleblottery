@@ -1,3 +1,14 @@
 [sv1]
 listen_host = "127.0.0.1"
 listen_port = 3333
+
+bitcoin_network = "regtest"
+bitcoin_rpc_host = "127.0.0.1"
+bitcoin_rpc_port = 18443
+bitcoin_rpc_user = "username"
+bitcoin_rpc_pass = "password"
+
+getblocktemplate_interval = 0.5
+
+solo_miner_signature = "⛏️plebs be hashin ⚡"
+solo_miner_address = "bcrt1qrs7f0p6g6gmetppm83hctr7qdd52h4sx97h6wv"
