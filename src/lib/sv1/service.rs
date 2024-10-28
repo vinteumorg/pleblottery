@@ -136,7 +136,9 @@ impl Sv1Service {
 
                     if sv1_handler.is_authorized {
                         let sv1_set_difficulty =
-                            sv1_api::methods::server_to_client::SetDifficulty { value: 0.00002328342918345014 };
+                            sv1_api::methods::server_to_client::SetDifficulty {
+                                value: 0.00002328342918345014,
+                            };
 
                         let sv1_set_difficulty_msg: sv1_api::json_rpc::Message =
                             sv1_set_difficulty.into();
