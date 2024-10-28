@@ -73,15 +73,18 @@ impl Sv1Service {
 
     pub fn serve(self) -> tokio::task::JoinHandle<anyhow::Result<()>> {
         let sv1_handler_clone = self.sv1_handler.clone();
-        let handle = tokio::task::spawn(async move {
+
+        // we spawn a task for listening on sockets and return it as the main sv1 service handle
+        let service_handle = tokio::task::spawn(async move {
             while let Ok((stream, addr)) = self.listener.accept().await {
                 tracing::info!("established sv1 connection: {}", addr);
 
-                Self::handle_tcp_stream(stream, addr, sv1_handler_clone.clone());
+                Self::tcp_stream_handler(stream, addr, sv1_handler_clone.clone());
             }
             Ok(())
         });
 
+        // block_template_updater is spawned in the background, no handle is returned
         tokio::task::spawn(async move {
             Self::block_template_updater(
                 self.bitcoin_rpc_client,
@@ -91,7 +94,7 @@ impl Sv1Service {
             .await;
         });
 
-        handle
+        service_handle
     }
 
     async fn tcp_writer_task(mut tcp_writer: TcpStream, mut writer_rx: mpsc::Receiver<String>) {
@@ -104,7 +107,7 @@ impl Sv1Service {
         }
     }
 
-    fn handle_tcp_stream(
+    fn tcp_stream_handler(
         stream: TcpStream,
         addr: std::net::SocketAddr,
         sv1_handler: Arc<Mutex<Sv1Handler>>,
