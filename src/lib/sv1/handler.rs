@@ -32,9 +32,21 @@ impl Sv1Handler {
 impl<'a> sv1_api::IsServer<'a> for Sv1Handler {
     fn handle_configure(
         &mut self,
-        _request: &Configure,
+        request: &Configure,
     ) -> (Option<VersionRollingParams>, Option<bool>) {
-        todo!()
+        tracing::info!("handling mining.configure");
+        let version_rolling_mask = request
+            .version_rolling_mask()
+            .map(|mask| HexU32Be(mask & 0x1FFFE000));
+        let version_rolling_min_bit = request.version_rolling_min_bit_count();
+
+        (
+            Some(sv1_api::server_to_client::VersionRollingParams::new(
+                version_rolling_mask.clone().unwrap_or(HexU32Be(0)),
+                version_rolling_min_bit.clone().unwrap_or(HexU32Be(0)),
+            ).expect("Version mask invalid, automatic version mask selection not supported, please change it in carte::downstream_sv1::mod.rs")),
+            Some(false),
+        )
     }
 
     // dummy
@@ -61,7 +73,9 @@ impl<'a> sv1_api::IsServer<'a> for Sv1Handler {
     }
 
     fn handle_submit(&self, _request: &Submit<'a>) -> bool {
-        todo!()
+        tracing::info!("handling mining.submit");
+
+        true
     }
 
     fn handle_extranonce_subscribe(&self) {
@@ -102,11 +116,11 @@ impl<'a> sv1_api::IsServer<'a> for Sv1Handler {
     }
 
     fn set_version_rolling_mask(&mut self, _mask: Option<HexU32Be>) {
-        todo!()
+        // todo!()
     }
 
     fn set_version_rolling_min_bit(&mut self, _mask: Option<HexU32Be>) {
-        todo!()
+        // todo!()
     }
 
     fn notify(&mut self) -> Result<Message, Error> {
