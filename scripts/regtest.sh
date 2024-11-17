@@ -1,7 +1,10 @@
 #!/bin/sh
 
-# Set a custom data directory under /tmp
-BITCOIN_DATADIR="/tmp/bitcoin_regtest"
+# Get the directory of the current script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source env.sh
+source "$SCRIPT_DIR/env.sh"
 
 # Stop any running bitcoind instance (if any)
 echo "Stopping any running bitcoind instance..."
