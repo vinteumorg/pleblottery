@@ -118,6 +118,9 @@ impl Sv1Service {
             // split TcpStream
             let (tcp_reader, tcp_writer) = (stream.clone(), stream);
 
+            // clone for children tasks monitoring
+            let tcp_writer_clone = tcp_writer.clone();
+
             // leverage channels to receive/send asynchronously
             let (writer_tx, writer_rx) = mpsc::channel::<String>(1);
 
@@ -135,10 +138,16 @@ impl Sv1Service {
                 loop {
                     std::thread::sleep(std::time::Duration::from_secs(5));
 
+                    let tcp_alive = tcp_writer_clone.peer_addr().is_err();
+                    if !tcp_alive {
+                        // kill task
+                        tracing::info!("tcp socket dropped... exiting tcp_stream_handler task");
+                        return;
+                    }
+
                     let sv1_handler = sv1_handler_clone.lock().await;
 
                     if sv1_handler.is_authorized {
-                        if !writer_tx_clone.is_closed() {
                             let sv1_set_difficulty =
                                 sv1_api::methods::server_to_client::SetDifficulty {
                                     value: 0.00002328342918345014,
@@ -163,9 +172,6 @@ impl Sv1Service {
                                 .send(sv1_set_difficulty_msg_str_fmt)
                                 .await
                                 .expect("should always work");
-                        }
-
-                        if !writer_tx_clone.is_closed() {
                             let sv1_notify = sv1_api::methods::server_to_client::Notify {
                                 job_id: "0".to_string(),
                                 prev_hash: sv1_handler.template.prevhash.clone(),
@@ -194,7 +200,7 @@ impl Sv1Service {
                                 .send(sv1_notify_msg_str_fmt)
                                 .await
                                 .expect("should always work");
-                        }
+
                     };
                 }
             });
