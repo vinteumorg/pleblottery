@@ -26,6 +26,7 @@ the coinbase payout goes to one single address, **without any kind of pooled rew
 - [ ] handle multiple workers via Stratum V1
 - [ ] handle 1 worker via Stratum V2
 - [ ] handle multiple workers via Stratum V2
+- [ ] support Sv2 Template Distribution protocol (alternative to GBT)
 
 when multiple workers are supported, `pleblottery` should distribute jobs with proper search space allocation based on worker hashrate.
 
