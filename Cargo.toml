@@ -40,3 +40,10 @@ bitcoincore-rpc-json = { version = "0.19.0" }
 
 # misc
 hex = "0.4.3"
+
+# tokio debugging
+console-subscriber = { version = "0.4.1", optional = true }
+
+[features]
+default = []
+tokio_debug = ["console-subscriber"]

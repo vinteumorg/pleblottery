@@ -1,6 +1,7 @@
 #![allow(special_module_name)]
 
 use clap::Parser;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter, Registry};
 
 use crate::cli::CliArgs;
 
@@ -10,7 +11,36 @@ mod lib;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt::init();
+
+    // Configure tracing
+    let subscriber = Registry::default();
+
+    #[cfg(feature = "tokio_debug")]
+    {
+        // Layer for tokio-console
+        let console_layer = console_subscriber::spawn();
+
+        // Layer for standard tracing output with a filter
+        let fmt_layer = fmt::Layer::default()
+            .with_filter(EnvFilter::new("debug")); // Only show DEBUG and above
+
+        // Combine both layers
+        let combined = subscriber.with(console_layer).with(fmt_layer);
+        tracing::subscriber::set_global_default(combined)
+            .expect("Failed to set subscriber");
+    }
+
+    #[cfg(not(feature = "tokio_debug"))]
+    {
+        // Layer for standard tracing output with a filter
+        let fmt_layer = fmt::Layer::default()
+            .with_filter(EnvFilter::new("info")); // Only show INFO and above
+        let combined = subscriber.with(fmt_layer);
+        tracing::subscriber::set_global_default(combined)
+            .expect("Failed to set subscriber");
+    }
+
+    // Log a test message
     tracing::info!("⛏️ plebs be hashin ⚡");
 
     let args = CliArgs::parse();
