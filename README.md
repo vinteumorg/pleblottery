@@ -16,7 +16,7 @@ pleblottery
 
 the idea is similar to [`public-pool`](https://github.com/benjamin-wilson/public-pool) and [`ckpool-solo`](https://bitbucket.org/ckolivas/ckpool-solo/), but we're explicitly avoiding the "pool" terminology to avoid ambiguity and confusion.
 
-the coinbase payout goes to one single address, **without any kind of pooled reward distribution**.
+the coinbase payout goes to one single locking script, **without any kind of pooled reward distribution**.
 
 ![](diagram.svg)
 
