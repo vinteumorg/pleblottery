@@ -9,4 +9,4 @@ we leverage [`tokio-console`](https://github.com/tokio-rs/console) instrumentati
 - launch `pleblottery` with `tokio_debug` feature flag enabled on first pane
 - launch `tokio-console` for monitoring tokio tasks on second pane
 
-![](tokio-console.png)
+![](./img/tokio-console.png)
