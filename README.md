@@ -1,6 +1,6 @@
 <h1 align="center">
   <br>
-  <img width="700" src="pleblottery.png">
+  <img width="700" src="src/web/assets/images/pleblottery.png">
 <br>
 </h1>
 
