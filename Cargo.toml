@@ -14,7 +14,6 @@ toml = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 tracing = "0.1"
 tracing-subscriber = "0.3.19"
-key-utils = "1.2.0"
 axum = "0.8.3"
 tower-http = { version = "0.6.2", features = ["fs"] }
 axum-htmx = "0.7.0"
