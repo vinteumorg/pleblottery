@@ -28,8 +28,10 @@ pub struct PleblotteryConfig {
 
 impl PleblotteryConfig {
     pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
-        let contents = fs::read_to_string(path)?;
-        let config: Self = toml::from_str(&contents)?;
+        let contents = fs::read_to_string(path)
+            .map_err(|e| anyhow::anyhow!("Failed to read config file: {}", e))?;
+        let config: Self = toml::from_str(&contents)
+            .map_err(|e| anyhow::anyhow!("Failed to parse config file: {}", e))?;
         Ok(config)
     }
 }
