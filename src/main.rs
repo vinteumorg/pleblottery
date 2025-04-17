@@ -1,11 +1,14 @@
 mod cli;
 mod config;
+mod service;
+mod sv2_handlers;
 mod web;
 
 use clap::Parser;
 use tracing::info;
 
 use config::PleblotteryConfig;
+use service::PlebLotteryService;
 use web::server::start_web_server;
 
 #[tokio::main]
@@ -19,8 +22,12 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Config: {:?}", config);
 
-    // todo: start the server service with mining protocol handler
-    // todo: start the client service with template distribution protocol handler
+    let mut pleblottery_service = PlebLotteryService::new(
+        config.mining_server_config.into(),
+        config.template_distribution_config.into(),
+    )?;
+
+    pleblottery_service.start().await?;
 
     start_web_server().await?;
     info!("Web server started on http://localhost:8000");
@@ -28,8 +35,9 @@ async fn main() -> anyhow::Result<()> {
     // Wait for Ctrl+C
     tokio::signal::ctrl_c().await?;
 
-    // todo: shutdown the server service
-    // todo: shutdown the client service
+    info!("Shutting down...");
+
+    pleblottery_service.shutdown().await?;
 
     Ok(())
 }
