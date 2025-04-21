@@ -25,6 +25,25 @@ the coinbase payout goes to one single output, **without any kind of pooled rewa
 <br>
 </h1>
 
-## instructions
+## `flake`-based `pleblottery-playground`
+
+`flake.nix` deploys `pleblottery-playground` environment, which consists of:
+- Sv2 Template Provider ([Bitcoin Core Sv2 Patch by Sjors](https://github.com/Sjors/bitcoin)) connected to a custom signet of Sv2 Community.
+- `pleblottery` instance
+
+in order to launch `pleblottery-playground`, run:
+
+```
+$ nix develop
+# Building Bitcoin Core Sv2 fork by @Sjors via nix-bitcoin-core-archive...
+/nix/store/8j3apdyyg4lanki4f4mabc3yl0w0lf20-bitcoind-sv2-v28.99.0
+Creating bitcoin.conf...
+
+Environment setup complete!
+Run 'pleblottery_playground' to launch bitcoind and pleblottery side-by-side in tmux
+# pleblottery_playground
+```
+
+## mainnet instructions
 
 soon™
