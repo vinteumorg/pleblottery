@@ -14,17 +14,23 @@ pub struct PlebLotteryTemplateDistributionClientHandler {}
 impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionClientHandler {
     async fn handle_new_template(
         &self,
-        _template: NewTemplate<'static>,
+        template: NewTemplate<'static>,
     ) -> Result<ResponseFromSv2Client<'static>, RequestToSv2ClientError> {
-        info!("Received NewTemplate message");
+        info!(
+            "Received NewTemplate message with template id {:?}",
+            template.template_id
+        );
         Ok(ResponseFromSv2Client::ToDo)
     }
 
     async fn handle_set_new_prev_hash(
         &self,
-        _prev_hash: SetNewPrevHash<'static>,
+        prev_hash: SetNewPrevHash<'static>,
     ) -> Result<ResponseFromSv2Client<'static>, RequestToSv2ClientError> {
-        info!("Received SetNewPrevHash message");
+        info!(
+            "Received SetNewPrevHash message with prev hash {:?}",
+            prev_hash.prev_hash
+        );
         Ok(ResponseFromSv2Client::ToDo)
     }
 
