@@ -6,12 +6,17 @@ use tower_stratum::roles_logic_sv2::template_distribution_sv2::{
     NewTemplate, RequestTransactionDataError, RequestTransactionDataSuccess, SetNewPrevHash,
 };
 
+use std::task::{Context, Poll};
 use tracing::info;
 
 #[derive(Debug, Clone, Default)]
 pub struct PlebLotteryTemplateDistributionClientHandler {}
 
 impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionClientHandler {
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), RequestToSv2ClientError>> {
+        Poll::Ready(Ok(()))
+    }
+
     async fn handle_new_template(
         &self,
         template: NewTemplate<'static>,

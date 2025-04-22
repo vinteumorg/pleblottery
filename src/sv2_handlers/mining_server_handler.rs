@@ -7,6 +7,7 @@ use tower_stratum::server::service::request::RequestToSv2ServerError;
 use tower_stratum::server::service::response::ResponseFromSv2Server;
 use tower_stratum::server::service::subprotocols::mining::handler::Sv2MiningServerHandler;
 
+use std::task::{Context, Poll};
 use tracing::info;
 
 #[derive(Debug, Clone, Default)]
@@ -15,6 +16,10 @@ pub struct PlebLotteryMiningServerHandler {
 }
 
 impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), RequestToSv2ServerError>> {
+        Poll::Ready(Ok(()))
+    }
+
     fn setup_connection_success_flags(&self) -> u32 {
         // no requirement for fixed version field
         // no requirement for extended channel only
