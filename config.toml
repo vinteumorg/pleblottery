@@ -8,3 +8,6 @@ inactivity_limit = 3600
 [template_distribution_config]
 server_addr = "127.0.0.1:8442"
 # auth_pk = "9bwHCYnjhbHm4AS3pWg9MtAH83mzWohoJJJDELYBqZhDNqszDLc"
+
+[web_config]
+listening_port = 1337
