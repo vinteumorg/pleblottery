@@ -25,9 +25,15 @@ pub struct PlebLotteryTemplateDistributionClientConfig {
 }
 
 #[derive(Clone, Deserialize, Debug)]
+pub struct PlebLotteryWebConfig {
+    pub listening_port: u16,
+}
+
+#[derive(Clone, Deserialize, Debug)]
 pub struct PleblotteryConfig {
     pub mining_server_config: PlebLotteryMiningServerConfig,
     pub template_distribution_config: PlebLotteryTemplateDistributionClientConfig,
+    pub web_config: PlebLotteryWebConfig,
 }
 
 impl PleblotteryConfig {

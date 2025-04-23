@@ -29,8 +29,11 @@ async fn main() -> anyhow::Result<()> {
 
     pleblottery_service.start().await?;
 
-    start_web_server().await?;
-    info!("Web server started on http://localhost:8000");
+    start_web_server(&config.web_config).await?;
+    info!(
+        "Web server started on http://localhost:{}",
+        config.web_config.listening_port
+    );
 
     // Wait for Ctrl+C
     tokio::signal::ctrl_c().await?;
