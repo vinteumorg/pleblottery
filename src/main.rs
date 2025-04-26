@@ -1,15 +1,10 @@
-mod cli;
-mod config;
-mod service;
-mod sv2_handlers;
-mod web;
-
 use clap::Parser;
 use tracing::info;
 
-use config::PleblotteryConfig;
-use service::PlebLotteryService;
-use web::server::start_web_server;
+use pleblottery::cli;
+use pleblottery::config::PleblotteryConfig;
+use pleblottery::service::PlebLotteryService;
+use pleblottery::web::server::start_web_server;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
