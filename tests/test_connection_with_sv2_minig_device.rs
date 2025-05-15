@@ -1,6 +1,6 @@
 use const_sv2::{MESSAGE_TYPE_SETUP_CONNECTION, MESSAGE_TYPE_SETUP_CONNECTION_SUCCESS};
 use integration_tests_sv2::*;
-use pleblottery::service::PlebLotteryService;
+use pleblottery::{service::PlebLotteryService, state::SharedStateHandle};
 
 mod common;
 use common::load_config;
@@ -12,9 +12,12 @@ async fn test_connection_with_sv2_minig_device() {
     let mut config = load_config();
     config.template_distribution_config.server_addr = tp_address;
 
+    let shared_state: SharedStateHandle = SharedStateHandle::default();
+
     let mut pleblottery_service = PlebLotteryService::new(
         config.mining_server_config.clone().into(),
         config.template_distribution_config.clone().into(),
+        shared_state,
     )
     .map_err(|e| format!("Failed to create PlebLotteryService: {}", e))
     .expect("Failed to create PlebLotteryService");
