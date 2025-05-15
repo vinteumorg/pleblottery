@@ -35,11 +35,12 @@ fn get_available_port() -> u16 {
 }
 
 pub fn load_config() -> PleblotteryConfig {
-    let available_addr = get_available_address();
+    let mining_server_available_addr = get_available_address();
+    let web_server_available_addr = get_available_address();
 
     PleblotteryConfig {
         mining_server_config: PlebLotteryMiningServerConfig {
-            listening_port: available_addr.port(),
+            listening_port: mining_server_available_addr.port(),
             pub_key: "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"
                 .parse()
                 .expect("Invalid public key"),
@@ -54,7 +55,7 @@ pub fn load_config() -> PleblotteryConfig {
             auth_pk: None,
         },
         web_config: PlebLotteryWebConfig {
-            listening_port: 1337,
+            listening_port: web_server_available_addr.port(),
         },
     }
 }
