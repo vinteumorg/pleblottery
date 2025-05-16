@@ -7,12 +7,20 @@ use tower_stratum::server::service::request::RequestToSv2ServerError;
 use tower_stratum::server::service::response::ResponseFromSv2Server;
 use tower_stratum::server::service::subprotocols::mining::handler::Sv2MiningServerHandler;
 
+use crate::state::SharedStateHandle;
+
 use std::task::{Context, Poll};
 use tracing::info;
 
 #[derive(Debug, Clone, Default)]
 pub struct PlebLotteryMiningServerHandler {
-    // todo
+    pub shared_state: SharedStateHandle,
+}
+
+impl PlebLotteryMiningServerHandler {
+    pub fn new(shared_state: SharedStateHandle) -> Self {
+        Self { shared_state }
+    }
 }
 
 impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
@@ -103,17 +111,41 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
 
     async fn on_new_template(
         &self,
-        _m: NewTemplate<'static>,
+        template: NewTemplate<'static>,
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
-        info!("Received NewTemplate message");
+        info!(
+            "Received NewTemplate message with template id {:?}",
+            template.template_id
+        );
+
+        {
+            let mut state = self.shared_state.write().await;
+            state.latest_template = Some(template);
+        }
+
         Ok(ResponseFromSv2Server::ToDo)
     }
 
     async fn on_set_new_prev_hash(
         &self,
-        _m: SetNewPrevHash<'static>,
+        prev_hash: SetNewPrevHash<'static>,
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
-        info!("Received SetNewPrevHash message");
+        info!(
+            "Received SetNewPrevHash message with prev hash {}",
+            prev_hash
+                .prev_hash
+                .to_vec()
+                .iter()
+                .rev()
+                .map(|byte| format!("{:02x}", byte))
+                .collect::<String>()
+        );
+
+        {
+            let mut state = self.shared_state.write().await;
+            state.latest_prev_hash = Some(prev_hash);
+        }
+
         Ok(ResponseFromSv2Server::ToDo)
     }
 }
