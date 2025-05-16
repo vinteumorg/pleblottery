@@ -1,3 +1,4 @@
+use crate::state::SharedStateHandle;
 use crate::sv2_handlers::mining_server_handler::PlebLotteryMiningServerHandler;
 use crate::sv2_handlers::template_distribution_client_handler::PlebLotteryTemplateDistributionClientHandler;
 use anyhow::{anyhow, Result};
@@ -24,8 +25,9 @@ impl PlebLotteryService {
     pub fn new(
         server_config: Sv2ServerServiceConfig,
         client_config: Sv2ClientServiceConfig,
+        shared_state: SharedStateHandle,
     ) -> Result<Self> {
-        let mining_server_handler = PlebLotteryMiningServerHandler::default();
+        let mining_server_handler = PlebLotteryMiningServerHandler::new(shared_state);
         let template_distribution_client_handler =
             PlebLotteryTemplateDistributionClientHandler::default();
 

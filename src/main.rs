@@ -4,6 +4,7 @@ use tracing::info;
 use pleblottery::cli;
 use pleblottery::config::PleblotteryConfig;
 use pleblottery::service::PlebLotteryService;
+use pleblottery::state::SharedStateHandle;
 use pleblottery::web::server::start_web_server;
 
 #[tokio::main]
@@ -17,14 +18,17 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Config: {:?}", config);
 
+    let shared_state: SharedStateHandle = SharedStateHandle::default();
+
     let mut pleblottery_service = PlebLotteryService::new(
         config.mining_server_config.into(),
         config.template_distribution_config.into(),
+        shared_state.clone(),
     )?;
 
     pleblottery_service.start().await?;
 
-    start_web_server(&config.web_config).await?;
+    start_web_server(&config.web_config, shared_state.clone()).await?;
     info!(
         "Web server started on http://localhost:{}",
         config.web_config.listening_port
