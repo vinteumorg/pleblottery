@@ -52,7 +52,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         _m: OpenStandardMiningChannel<'static>,
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
         info!("Received OpenStandardMiningChannel message");
-        Ok(ResponseFromSv2Server::ToDo)
+        Ok(ResponseFromSv2Server::Ok)
     }
 
     async fn handle_open_extended_mining_channel(
@@ -61,7 +61,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         _m: OpenExtendedMiningChannel<'static>,
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
         info!("Received OpenExtendedMiningChannel message");
-        Ok(ResponseFromSv2Server::ToDo)
+        Ok(ResponseFromSv2Server::Ok)
     }
 
     async fn handle_update_channel(
@@ -70,7 +70,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         _m: UpdateChannel<'static>,
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
         info!("Received UpdateChannel message");
-        Ok(ResponseFromSv2Server::ToDo)
+        Ok(ResponseFromSv2Server::Ok)
     }
 
     async fn handle_close_channel(
@@ -79,7 +79,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         _m: CloseChannel<'static>,
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
         info!("Received CloseChannel message");
-        Ok(ResponseFromSv2Server::ToDo)
+        Ok(ResponseFromSv2Server::Ok)
     }
 
     async fn handle_submit_shares_standard(
@@ -88,7 +88,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         _m: SubmitSharesStandard,
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
         info!("Received SubmitSharesStandard message");
-        Ok(ResponseFromSv2Server::ToDo)
+        Ok(ResponseFromSv2Server::Ok)
     }
 
     async fn handle_submit_shares_extended(
@@ -97,7 +97,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         _m: SubmitSharesExtended<'static>,
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
         info!("Received SubmitSharesExtended message");
-        Ok(ResponseFromSv2Server::ToDo)
+        Ok(ResponseFromSv2Server::Ok)
     }
 
     async fn handle_set_custom_mining_job(
@@ -106,7 +106,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         _m: SetCustomMiningJob<'static>,
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
         info!("Received SetCustomMiningJob message");
-        Ok(ResponseFromSv2Server::ToDo)
+        Ok(ResponseFromSv2Server::Ok)
     }
 
     async fn on_new_template(
@@ -123,7 +123,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
             state.latest_template = Some(template);
         }
 
-        Ok(ResponseFromSv2Server::ToDo)
+        Ok(ResponseFromSv2Server::Ok)
     }
 
     async fn on_set_new_prev_hash(
@@ -146,6 +146,6 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
             state.latest_prev_hash = Some(prev_hash);
         }
 
-        Ok(ResponseFromSv2Server::ToDo)
+        Ok(ResponseFromSv2Server::Ok)
     }
 }

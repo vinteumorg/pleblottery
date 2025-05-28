@@ -87,6 +87,7 @@ impl From<PlebLotteryTemplateDistributionClientConfig> for Sv2ClientServiceConfi
                 server_addr: config.server_addr,
                 auth_pk: config.auth_pk,
                 coinbase_output_constraints: (1, 1), // todo: fix this
+                setup_connection_flags: 0,
             }),
         }
     }
