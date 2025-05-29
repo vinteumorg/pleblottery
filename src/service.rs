@@ -5,8 +5,8 @@ use anyhow::{anyhow, Result};
 use tower_stratum::client::service::config::Sv2ClientServiceConfig;
 use tower_stratum::client::service::request::RequestToSv2Client;
 use tower_stratum::client::service::response::ResponseFromSv2Client;
+use tower_stratum::client::service::subprotocols::mining::handler::NullSv2MiningClientHandler;
 use tower_stratum::client::service::subprotocols::template_distribution::request::RequestToSv2TemplateDistributionClientService;
-use tower_stratum::client::service::subprotocols::template_distribution::response::ResponseToTemplateDistributionTrigger;
 use tower_stratum::client::service::Sv2ClientService;
 use tower_stratum::server::service::config::Sv2ServerServiceConfig;
 use tower_stratum::server::service::Sv2ServerService;
@@ -18,7 +18,8 @@ pub struct PlebLotteryService {
     server_config: Sv2ServerServiceConfig,
     server_service: Sv2ServerService<PlebLotteryMiningServerHandler>,
     client_config: Sv2ClientServiceConfig,
-    client_service: Sv2ClientService<PlebLotteryTemplateDistributionClientHandler>,
+    client_service:
+        Sv2ClientService<NullSv2MiningClientHandler, PlebLotteryTemplateDistributionClientHandler>,
 }
 
 impl PlebLotteryService {
@@ -36,6 +37,7 @@ impl PlebLotteryService {
                 .map_err(|_| anyhow::anyhow!("Failed to create server service"))?;
         let client_service = Sv2ClientService::new_with_sibling_io(
             client_config.clone(),
+            NullSv2MiningClientHandler,
             template_distribution_client_handler,
             sibling_server_io,
         )
@@ -87,9 +89,7 @@ impl PlebLotteryService {
             .map_err(|e| anyhow!("Failed to request coinbase output constraints: {:?}", e))?;
 
         match set_coinbase_output_constraints_response {
-            ResponseFromSv2Client::ResponseToTemplateDistributionTrigger(
-                ResponseToTemplateDistributionTrigger::SuccessfullySetCoinbaseOutputConstraints,
-            ) => {
+            ResponseFromSv2Client::Ok => {
                 info!("Successfully set Coinbase Output Constraints with Template Distribution Server");
             }
             _ => {
