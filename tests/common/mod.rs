@@ -49,6 +49,8 @@ pub fn load_config() -> PleblotteryConfig {
                 .expect("Invalid private key"),
             cert_validity: 3600,
             inactivity_limit: 3600,
+            coinbase_output_address: "bc1qypgev2h0x0p0w7efw6pkd8xuv85ccxj7za4ljp".into(),
+            mining_network: "bitcoin".into(),
         },
         template_distribution_config: PlebLotteryTemplateDistributionClientConfig {
             server_addr: "127.0.0.1:8442".parse().expect("Invalid server address"),
