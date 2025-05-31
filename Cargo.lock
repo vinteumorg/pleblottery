@@ -2209,6 +2209,7 @@ dependencies = [
  "axum",
  "axum-htmx",
  "binary_codec_sv2",
+ "bitcoin",
  "clap",
  "const_sv2",
  "integration_tests_sv2",
