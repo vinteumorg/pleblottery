@@ -1,7 +1,9 @@
-use serde::Deserialize;
+use bitcoin::Address;
+use serde::{Deserialize, Deserializer};
 use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::Path;
+use std::str::FromStr;
 use tower_stratum::client::service::config::Sv2ClientServiceConfig;
 use tower_stratum::client::service::config::Sv2ClientServiceTemplateDistributionConfig;
 use tower_stratum::key_utils::Secp256k1PublicKey;
@@ -9,13 +11,46 @@ use tower_stratum::key_utils::Secp256k1SecretKey;
 use tower_stratum::server::service::config::Sv2ServerServiceConfig;
 use tower_stratum::server::service::config::Sv2ServerServiceMiningConfig;
 use tower_stratum::server::service::config::Sv2ServerTcpConfig;
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Debug)]
 pub struct PlebLotteryMiningServerConfig {
     pub listening_port: u16,
     pub pub_key: Secp256k1PublicKey,
     pub priv_key: Secp256k1SecretKey,
     pub cert_validity: u64,
     pub inactivity_limit: u64,
+    pub coinbase_output_script: bitcoin::ScriptBuf,
+}
+
+impl<'de> Deserialize<'de> for PlebLotteryMiningServerConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Helper {
+            listening_port: u16,
+            pub_key: Secp256k1PublicKey,
+            priv_key: Secp256k1SecretKey,
+            cert_validity: u64,
+            inactivity_limit: u64,
+            coinbase_output_address: String,
+        }
+        let helper = Helper::deserialize(deserializer).map_err(|e| {
+            serde::de::Error::custom(format!("Failed to deserialize mining server config: {e}"))
+        })?;
+
+        let address = Address::from_str(&helper.coinbase_output_address)
+            .map_err(|e| serde::de::Error::custom(format!("Invalid coinbase output address: {e}")))?
+            .assume_checked();
+        Ok(PlebLotteryMiningServerConfig {
+            listening_port: helper.listening_port,
+            pub_key: helper.pub_key,
+            priv_key: helper.priv_key,
+            cert_validity: helper.cert_validity,
+            inactivity_limit: helper.inactivity_limit,
+            coinbase_output_script: address.script_pubkey(),
+        })
+    }
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -90,5 +125,99 @@ impl From<PlebLotteryTemplateDistributionClientConfig> for Sv2ClientServiceConfi
                 setup_connection_flags: 0,
             }),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn dummy_pub_key() -> Secp256k1PublicKey {
+        Secp256k1PublicKey::from_str("9bDuixKmZqAJnrmP746n8zU1wyAQRrus7th9dxnkPg6RzQvCnan").unwrap()
+    }
+
+    fn dummy_priv_key() -> Secp256k1SecretKey {
+        Secp256k1SecretKey::from_str("zmBEmPhqo3A92FkiLVvyCz6htc3e53ph3ZbD4ASqGaLjwnFLi").unwrap()
+    }
+
+    fn make_config(address: &str) -> PlebLotteryMiningServerConfig {
+        let address: Address = Address::from_str(address).unwrap().assume_checked();
+        PlebLotteryMiningServerConfig {
+            listening_port: 8332,
+            pub_key: dummy_pub_key(),
+            priv_key: dummy_priv_key(),
+            cert_validity: 3600,
+            inactivity_limit: 300,
+            coinbase_output_script: address.script_pubkey(),
+        }
+    }
+
+    #[test]
+    fn test_coinbase_script_various_types() {
+        let cases = vec![
+            // (address, expected script prefix, description)
+            (
+                "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", // P2PKH
+                "76a9",
+                "Mainnet P2PKH",
+            ),
+            (
+                "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy", // P2SH
+                "a914",
+                "Mainnet P2SH",
+            ),
+            (
+                "bc1qryhgpmfv03qjhhp2dj8nw8g4ewg08jzmgy3cyx", // P2WPKH
+                "0014",
+                "Mainnet P2WPKH",
+            ),
+            (
+                "bc1p2m7q0yn78rjqh200dz0kut5xcxdnfxk4wcsau7zydnrv9ns875eq37vmkz", // Taproot
+                "5120",
+                "Mainnet Taproot",
+            ),
+            (
+                "mipcBbFg9gMiCh81Kj8tqqdgoZub1ZJRfn", // P2PKH
+                "76a9",
+                "Testnet P2PKH",
+            ),
+            (
+                "2N2JD6wb56AfK4tfmM6PwdVmoYk2dCKf4Br", // P2SH
+                "a914",
+                "Testnet P2SH",
+            ),
+            (
+                "tb1qw8rnkgnk7s48h6w5c0mg7we7gvzykeyp2sze82", // P2WPKH
+                "0014",
+                "Testnet P2WPKH",
+            ),
+            (
+                "tb1pktwvz28qttg8k6r9wkzrp75lek4tnl6qn9wezfz3l8nhy57q886qf9azpd", // Taproot
+                "5120",
+                "Testnet Taproot",
+            ),
+            (
+                "bcrt1q2nfxmhd4n3c8834pj72xagvyr9gl57n5r94fsl", // Regtest P2WPKH
+                "0014",
+                "Regtest P2WPKH",
+            ),
+        ];
+
+        for (address, expected_prefix, description) in cases {
+            let config: PlebLotteryMiningServerConfig = make_config(address);
+            let script = config.coinbase_output_script.clone();
+            let hex = script.to_hex_string();
+            assert!(
+                hex.starts_with(expected_prefix),
+                "Failed: {}, script: {}",
+                description,
+                hex
+            );
+        }
+    }
+    #[test]
+    fn test_coinbase_script_invalid_address_error() {
+        let result = std::panic::catch_unwind(|| make_config("this_is_not_a_valid_address"));
+        assert!(result.is_err(), "Expected panic for invalid address");
     }
 }

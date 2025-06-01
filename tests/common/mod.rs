@@ -2,9 +2,11 @@ use once_cell::sync::Lazy;
 use std::{
     collections::HashSet,
     net::{SocketAddr, TcpListener},
+    str::FromStr,
     sync::Mutex,
 };
 
+use bitcoin::Address;
 use pleblottery::config::{
     PlebLotteryMiningServerConfig, PlebLotteryTemplateDistributionClientConfig,
 };
@@ -49,6 +51,12 @@ pub fn load_config() -> PleblotteryConfig {
                 .expect("Invalid private key"),
             cert_validity: 3600,
             inactivity_limit: 3600,
+            coinbase_output_script: Address::from_str(
+                "bcrt1q2nfxmhd4n3c8834pj72xagvyr9gl57n5r94fsl",
+            )
+            .unwrap()
+            .assume_checked()
+            .script_pubkey(),
         },
         template_distribution_config: PlebLotteryTemplateDistributionClientConfig {
             server_addr: "127.0.0.1:8442".parse().expect("Invalid server address"),
