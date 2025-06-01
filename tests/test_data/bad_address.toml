@@ -1,0 +1,15 @@
+# Bad config: invalid address
+[mining_server_config]
+listening_port = 8332
+pub_key = "9bDuixKmZqAJnrmP746n8zU1wyAQRrus7th9dxnkPg6RzQvCnan"
+priv_key = "zmBEmPhqo3A92FkiLVvyCz6htc3e53ph3ZbD4ASqGaLjwnFLi"
+cert_validity = 3600
+inactivity_limit = 300
+coinbase_output_address = "not_a_real_address"
+
+[template_distribution_config]
+server_addr = "127.0.0.1:1234"
+# auth_pk = null
+
+[web_config]
+listening_port = 8080
