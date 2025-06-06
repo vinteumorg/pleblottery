@@ -1,9 +1,9 @@
 use binary_codec_sv2::{Decodable, Encodable};
-use const_sv2::MESSAGE_TYPE_NEW_TEMPLATE;
-use integration_tests_sv2::{sniffer, start_sniffer, start_template_provider};
+use integration_tests_sv2::{interceptor, start_sniffer, start_template_provider};
 use pleblottery::web::server::start_web_server;
 use pleblottery::{service::PlebLotteryService, state::SharedStateHandle};
 use reqwest::Client;
+use tower_stratum::roles_logic_sv2::template_distribution_sv2::MESSAGE_TYPE_NEW_TEMPLATE;
 mod common;
 use common::load_config;
 use tower_stratum::roles_logic_sv2::parsers::IsSv2Message;
@@ -25,8 +25,7 @@ use tower_stratum::roles_logic_sv2::template_distribution_sv2::SetNewPrevHash;
 async fn test_shared_state_between_service_and_web() {
     // Start a simulated Template Provider and attach a sniffer to monitor its messages
     let (_tp, tp_address) = start_template_provider(None);
-    let (tp_sniffer, tp_sniffer_addr) =
-        start_sniffer("".to_string(), tp_address, false, None).await;
+    let (tp_sniffer, tp_sniffer_addr) = start_sniffer("", tp_address, false, vec![]);
     let mut config = load_config();
     config.template_distribution_config.server_addr = tp_sniffer_addr;
 
@@ -56,7 +55,7 @@ async fn test_shared_state_between_service_and_web() {
     // Wait until a `NewTemplate` message is seen going downstream (from TP to service)
     tp_sniffer
         .wait_for_message_type_and_clean_queue(
-            sniffer::MessageDirection::ToDownstream,
+            interceptor::MessageDirection::ToDownstream,
             MESSAGE_TYPE_NEW_TEMPLATE,
         )
         .await;
