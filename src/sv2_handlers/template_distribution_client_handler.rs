@@ -42,11 +42,11 @@ impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionCli
             }
         }
 
-        let response = ResponseFromSv2Client::TriggerNewRequest(
+        let response = ResponseFromSv2Client::TriggerNewRequest(Box::new(
             RequestToSv2Client::SendRequestToSiblingServerService(Box::new(
                 RequestToSv2Server::MiningTrigger(RequestToSv2MiningServer::NewTemplate(template)),
             )),
-        );
+        ));
         Ok(response)
     }
 
@@ -54,13 +54,13 @@ impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionCli
         &self,
         prev_hash: SetNewPrevHash<'static>,
     ) -> Result<ResponseFromSv2Client<'static>, RequestToSv2ClientError> {
-        let response = ResponseFromSv2Client::TriggerNewRequest(
+        let response = ResponseFromSv2Client::TriggerNewRequest(Box::new(
             RequestToSv2Client::SendRequestToSiblingServerService(Box::new(
                 RequestToSv2Server::MiningTrigger(RequestToSv2MiningServer::SetNewPrevHash(
                     prev_hash,
                 )),
             )),
-        );
+        ));
         Ok(response)
     }
 
