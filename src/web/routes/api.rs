@@ -113,11 +113,15 @@ pub async fn get_latest_prev_hash(State(shared_state): State<SharedStateHandle>)
     let mut rows = String::new();
 
     if let Some(template) = &state.latest_template {
-        let current_height = template.coinbase_prefix.to_vec().as_slice()[1..]
+        let current_height = match template.coinbase_prefix.to_vec().as_slice()[1..]
             .iter()
             .rev()
             .fold(0, |acc, &byte| (acc << 8) | byte as u64)
-            - 1;
+            .checked_sub(1)
+        {
+            Some(h) => h,
+            None => 0,
+        };
         rows.push_str(&format!(
             r#"
             <tr>

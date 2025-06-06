@@ -27,11 +27,15 @@ impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionCli
         &self,
         template: NewTemplate<'static>,
     ) -> Result<ResponseFromSv2Client<'static>, RequestToSv2ClientError> {
-        let current_height = template.coinbase_prefix.to_vec().as_slice()[1..]
+        let current_height = match template.coinbase_prefix.to_vec().as_slice()[1..]
             .iter()
             .rev()
             .fold(0, |acc, &byte| (acc << 8) | byte as u64)
-            - 1;
+            .checked_sub(1)
+        {
+            Some(h) => h,
+            None => 0,
+        };
 
         {
             let mut height = self.current_height.write().await;
@@ -41,11 +45,11 @@ impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionCli
             }
         }
 
-        let response = ResponseFromSv2Client::TriggerNewRequest(
+        let response = ResponseFromSv2Client::TriggerNewRequest(Box::new(
             RequestToSv2Client::SendRequestToSiblingServerService(Box::new(
                 RequestToSv2Server::MiningTrigger(RequestToSv2MiningServer::NewTemplate(template)),
             )),
-        );
+        ));
         Ok(response)
     }
 
@@ -53,13 +57,13 @@ impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionCli
         &self,
         prev_hash: SetNewPrevHash<'static>,
     ) -> Result<ResponseFromSv2Client<'static>, RequestToSv2ClientError> {
-        let response = ResponseFromSv2Client::TriggerNewRequest(
+        let response = ResponseFromSv2Client::TriggerNewRequest(Box::new(
             RequestToSv2Client::SendRequestToSiblingServerService(Box::new(
                 RequestToSv2Server::MiningTrigger(RequestToSv2MiningServer::SetNewPrevHash(
                     prev_hash,
                 )),
             )),
-        );
+        ));
         Ok(response)
     }
 
