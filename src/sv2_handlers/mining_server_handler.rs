@@ -1,3 +1,4 @@
+use tokio::sync::RwLock;
 use tower_stratum::roles_logic_sv2::mining_sv2::{
     CloseChannel, OpenExtendedMiningChannel, OpenStandardMiningChannel, SetCustomMiningJob,
     SubmitSharesExtended, SubmitSharesStandard, UpdateChannel,
@@ -9,17 +10,29 @@ use tower_stratum::server::service::subprotocols::mining::handler::Sv2MiningServ
 
 use crate::state::SharedStateHandle;
 
+use std::collections::HashMap;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use tracing::info;
 
+#[derive(Debug)]
+pub struct PleblotteryMiningClient {
+    pub client_id: u32,
+    pub connection_flags: u32,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct PlebLotteryMiningServerHandler {
+    pub clients: Arc<RwLock<HashMap<u32, Arc<RwLock<PleblotteryMiningClient>>>>>,
     pub shared_state: SharedStateHandle,
 }
 
 impl PlebLotteryMiningServerHandler {
     pub fn new(shared_state: SharedStateHandle) -> Self {
-        Self { shared_state }
+        Self {
+            shared_state,
+            clients: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 }
 
@@ -34,8 +47,18 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         0
     }
 
-    async fn add_client(&mut self, _client_id: u32, _flags: u32) {
-        // todo
+    async fn add_client(&mut self, client_id: u32, flags: u32) {
+        info!("Adding client with id: {}, flags: {}", client_id, flags);
+
+        let client = PleblotteryMiningClient {
+            client_id,
+            connection_flags: flags,
+        };
+
+        self.clients
+            .write()
+            .await
+            .insert(client_id, Arc::new(RwLock::new(client)));
     }
 
     async fn remove_client(&mut self, _client_id: u32) {
