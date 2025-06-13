@@ -1,3 +1,5 @@
+use crate::config::PlebLotteryMiningServerConfig;
+use crate::config::PlebLotteryTemplateDistributionClientConfig;
 use crate::state::SharedStateHandle;
 use crate::sv2_handlers::mining_server_handler::PlebLotteryMiningServerHandler;
 use crate::sv2_handlers::template_distribution_client_handler::PlebLotteryTemplateDistributionClientHandler;
@@ -24,11 +26,17 @@ pub struct PlebLotteryService {
 
 impl PlebLotteryService {
     pub fn new(
-        server_config: Sv2ServerServiceConfig,
-        client_config: Sv2ClientServiceConfig,
+        mining_server_config: PlebLotteryMiningServerConfig,
+        template_distribution_client_config: PlebLotteryTemplateDistributionClientConfig,
         shared_state: SharedStateHandle,
     ) -> Result<Self> {
-        let mining_server_handler = PlebLotteryMiningServerHandler::new(shared_state);
+        let server_config: Sv2ServerServiceConfig = mining_server_config.clone().into();
+        let client_config: Sv2ClientServiceConfig = template_distribution_client_config.into();
+
+        let mining_server_handler = PlebLotteryMiningServerHandler::new(
+            shared_state,
+            mining_server_config.coinbase_output_script,
+        );
         let template_distribution_client_handler =
             PlebLotteryTemplateDistributionClientHandler::default();
 

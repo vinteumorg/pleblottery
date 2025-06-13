@@ -1,4 +1,5 @@
 use tokio::sync::RwLock;
+use tower_stratum::roles_logic_sv2::channels::server::group::GroupChannel;
 use tower_stratum::roles_logic_sv2::mining_sv2::{
     CloseChannel, OpenExtendedMiningChannel, OpenStandardMiningChannel, SetCustomMiningJob,
     SubmitSharesExtended, SubmitSharesStandard, UpdateChannel,
@@ -11,7 +12,10 @@ use tower_stratum::server::service::subprotocols::mining::handler::Sv2MiningServ
 use crate::state::SharedStateHandle;
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU32, Ordering},
+    Arc,
+};
 use std::task::{Context, Poll};
 use tracing::info;
 
@@ -19,19 +23,26 @@ use tracing::info;
 pub struct PleblotteryMiningClient {
     pub client_id: u32,
     pub connection_flags: u32,
+    pub channel_id_factory: Arc<AtomicU32>,
+    pub group_channel: Option<Arc<RwLock<GroupChannel<'static>>>>, // only one group per client, all standard channels belong to it
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct PlebLotteryMiningServerHandler {
     pub clients: Arc<RwLock<HashMap<u32, Arc<RwLock<PleblotteryMiningClient>>>>>,
     pub shared_state: SharedStateHandle,
+    pub coinbase_output_script: bitcoin::ScriptBuf,
 }
 
 impl PlebLotteryMiningServerHandler {
-    pub fn new(shared_state: SharedStateHandle) -> Self {
+    pub fn new(
+        shared_state: SharedStateHandle,
+        coinbase_output_script: bitcoin::ScriptBuf,
+    ) -> Self {
         Self {
             shared_state,
             clients: Arc::new(RwLock::new(HashMap::new())),
+            coinbase_output_script,
         }
     }
 }
@@ -50,9 +61,22 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
     async fn add_client(&mut self, client_id: u32, flags: u32) {
         info!("Adding client with id: {}, flags: {}", client_id, flags);
 
+        let channel_id_factory = Arc::new(AtomicU32::new(0));
+
+        // if SetupConnection.REQUIRES_STANDARD_JOBS is set
+        // client does not understand group channels
+        let group_channel = if flags & 0x0001 == 0x0001 {
+            None
+        } else {
+            let group_channel_id = channel_id_factory.fetch_add(1, Ordering::SeqCst);
+            Some(Arc::new(RwLock::new(GroupChannel::new(group_channel_id))))
+        };
+
         let client = PleblotteryMiningClient {
             client_id,
             connection_flags: flags,
+            channel_id_factory,
+            group_channel,
         };
 
         self.clients
@@ -145,6 +169,13 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
             let mut state = self.shared_state.write().await;
             state.latest_template = Some(template);
         }
+
+        let coinbase_output_script = self.coinbase_output_script.clone();
+
+        // todo
+        // for client in self.clients.read().await.values() {
+        //     let client = client.read().await;
+        // }
 
         Ok(ResponseFromSv2Server::Ok)
     }

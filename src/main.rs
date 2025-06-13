@@ -21,8 +21,8 @@ async fn main() -> anyhow::Result<()> {
     let shared_state: SharedStateHandle = SharedStateHandle::default();
 
     let mut pleblottery_service = PlebLotteryService::new(
-        config.mining_server_config.into(),
-        config.template_distribution_config.into(),
+        config.mining_server_config,
+        config.template_distribution_config,
         shared_state.clone(),
     )?;
 
