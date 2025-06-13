@@ -1,5 +1,5 @@
-use crate::config::PleblotteryConfig;
 use crate::state::SharedStateHandle;
+use crate::{config::PleblotteryConfig, utils::bip34_block_height};
 use axum::{extract::State, response::Html, Router};
 
 pub async fn serve_config_htmx() -> Html<String> {
@@ -113,11 +113,10 @@ pub async fn get_latest_prev_hash(State(shared_state): State<SharedStateHandle>)
     let mut rows = String::new();
 
     if let Some(template) = &state.latest_template {
-        let current_height = template.coinbase_prefix.to_vec().as_slice()[1..]
-            .iter()
-            .rev()
-            .fold(0, |acc, &byte| (acc << 8) | byte as u64)
-            - 1;
+        let current_height = match bip34_block_height(&template.coinbase_prefix.to_vec()) {
+            Ok(height) => height.checked_sub(1).unwrap_or(0), // Subtract 1 to get the **current** height
+            Err(_) => 0,
+        };
         rows.push_str(&format!(
             r#"
             <tr>

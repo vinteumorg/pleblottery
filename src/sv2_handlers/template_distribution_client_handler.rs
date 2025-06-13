@@ -13,6 +13,8 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use tokio::sync::RwLock;
 
+use crate::utils::bip34_block_height;
+
 #[derive(Debug, Clone, Default)]
 pub struct PlebLotteryTemplateDistributionClientHandler {
     current_height: Arc<RwLock<u64>>,
@@ -27,17 +29,16 @@ impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionCli
         &self,
         template: NewTemplate<'static>,
     ) -> Result<ResponseFromSv2Client<'static>, RequestToSv2ClientError> {
-        let current_height = template.coinbase_prefix.to_vec().as_slice()[1..]
-            .iter()
-            .rev()
-            .fold(0, |acc, &byte| (acc << 8) | byte as u64)
-            - 1;
+        let current_height = match bip34_block_height(&template.coinbase_prefix.to_vec()) {
+            Ok(height) => height.checked_sub(1).unwrap_or(0), // Subtract 1 to get the **current** height
+            Err(_) => 0,
+        };
 
         {
             let mut height = self.current_height.write().await;
             if current_height != *height {
                 *height = current_height;
-                info!("New Block Height: {}", current_height);
+                info!("Current Block Height: {}", current_height);
             }
         }
 
