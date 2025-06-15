@@ -6,7 +6,7 @@ use tower_stratum::client::service::config::Sv2ClientServiceConfig;
 use tower_stratum::client::service::request::RequestToSv2Client;
 use tower_stratum::client::service::response::ResponseFromSv2Client;
 use tower_stratum::client::service::subprotocols::mining::handler::NullSv2MiningClientHandler;
-use tower_stratum::client::service::subprotocols::template_distribution::request::RequestToSv2TemplateDistributionClientService;
+use tower_stratum::client::service::subprotocols::template_distribution::trigger::TemplateDistributionClientTrigger;
 use tower_stratum::client::service::Sv2ClientService;
 use tower_stratum::server::service::config::Sv2ServerServiceConfig;
 use tower_stratum::server::service::Sv2ServerService;
@@ -70,7 +70,7 @@ impl PlebLotteryService {
         let set_coinbase_output_constraints_response = self
             .client_service
             .call(RequestToSv2Client::TemplateDistributionTrigger(
-                RequestToSv2TemplateDistributionClientService::SetCoinbaseOutputConstraints(
+                TemplateDistributionClientTrigger::SetCoinbaseOutputConstraints(
                     self.client_config
                         .clone()
                         .template_distribution_config

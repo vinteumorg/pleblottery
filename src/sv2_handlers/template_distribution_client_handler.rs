@@ -6,7 +6,7 @@ use tower_stratum::roles_logic_sv2::template_distribution_sv2::{
     NewTemplate, RequestTransactionDataError, RequestTransactionDataSuccess, SetNewPrevHash,
 };
 use tower_stratum::server::service::request::RequestToSv2Server;
-use tower_stratum::server::service::subprotocols::mining::request::RequestToSv2MiningServer;
+use tower_stratum::server::service::subprotocols::mining::trigger::MiningServerTrigger;
 use tracing::info;
 
 use std::sync::Arc;
@@ -44,7 +44,7 @@ impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionCli
 
         let response = ResponseFromSv2Client::TriggerNewRequest(Box::new(
             RequestToSv2Client::SendRequestToSiblingServerService(Box::new(
-                RequestToSv2Server::MiningTrigger(RequestToSv2MiningServer::NewTemplate(template)),
+                RequestToSv2Server::MiningTrigger(MiningServerTrigger::NewTemplate(template)),
             )),
         ));
         Ok(response)
@@ -56,9 +56,7 @@ impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionCli
     ) -> Result<ResponseFromSv2Client<'static>, RequestToSv2ClientError> {
         let response = ResponseFromSv2Client::TriggerNewRequest(Box::new(
             RequestToSv2Client::SendRequestToSiblingServerService(Box::new(
-                RequestToSv2Server::MiningTrigger(RequestToSv2MiningServer::SetNewPrevHash(
-                    prev_hash,
-                )),
+                RequestToSv2Server::MiningTrigger(MiningServerTrigger::SetNewPrevHash(prev_hash)),
             )),
         ));
         Ok(response)
