@@ -41,34 +41,39 @@ pub fn load_config() -> PleblotteryConfig {
     let mining_server_available_addr = get_available_address();
     let web_server_available_addr = get_available_address();
 
-    PleblotteryConfig {
-        mining_server_config: PlebLotteryMiningServerConfig {
-            listening_port: mining_server_available_addr.port(),
-            pub_key: "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"
-                .parse()
-                .expect("Invalid public key"),
-            priv_key: "mkDLTBBRxdBv998612qipDYoTK3YUrqLe8uWw7gu3iXbSrn2n"
-                .parse()
-                .expect("Invalid private key"),
-            cert_validity: 3600,
-            inactivity_limit: 3600,
-            coinbase_output_script: Address::from_str(
-                "bcrt1q2nfxmhd4n3c8834pj72xagvyr9gl57n5r94fsl",
-            )
+    let mining_server_config = PlebLotteryMiningServerConfig {
+        listening_port: mining_server_available_addr.port(),
+        pub_key: "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"
+            .parse()
+            .expect("Invalid public key"),
+        priv_key: "mkDLTBBRxdBv998612qipDYoTK3YUrqLe8uWw7gu3iXbSrn2n"
+            .parse()
+            .expect("Invalid private key"),
+        cert_validity: 3600,
+        inactivity_limit: 3600,
+        coinbase_output_script: Address::from_str("bcrt1q2nfxmhd4n3c8834pj72xagvyr9gl57n5r94fsl")
             .unwrap()
             .assume_checked()
             .script_pubkey(),
-            coinbase_tag: "pleblottery".to_string(),
-            share_batch_size: 10,
-            expected_shares_per_minute: 1.0,
-        },
-        template_distribution_config: PlebLotteryTemplateDistributionClientConfig {
-            server_addr: "127.0.0.1:8442".parse().expect("Invalid server address"),
-            auth_pk: None,
-        },
-        web_config: PlebLotteryWebConfig {
-            listening_port: web_server_available_addr.port(),
-        },
+        coinbase_tag: "pleblottery".to_string(),
+        share_batch_size: 10,
+        expected_shares_per_minute: 1.0,
+    };
+
+    let template_distribution_config = PlebLotteryTemplateDistributionClientConfig {
+        server_addr: "127.0.0.1:8442".parse().expect("Invalid server address"),
+        auth_pk: None,
+        mining_server_config: Some(mining_server_config.clone()),
+    };
+
+    let web_config = PlebLotteryWebConfig {
+        listening_port: web_server_available_addr.port(),
+    };
+
+    PleblotteryConfig {
+        mining_server_config,
+        template_distribution_config,
+        web_config,
     }
 }
 
