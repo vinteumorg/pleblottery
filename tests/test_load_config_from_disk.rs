@@ -29,3 +29,25 @@ fn test_good_config() {
 fn test_bad_address() {
     let _ = PleblotteryConfig::from_file(config_path("bad_address.toml")).unwrap();
 }
+
+#[test]
+fn test_config_parsing_and_coinbase_output_constraint() {
+    let config = PleblotteryConfig::from_file("tests/test_data/good_config.toml")
+        .expect("Failed to parse config");
+
+    assert!(
+        config
+            .template_distribution_config
+            .mining_server_config
+            .is_some(),
+        "Mining server config should be present in the template distribution config"
+    );
+
+    assert_eq!(
+        config
+            .mining_server_config
+            .calculate_coinbase_output_constraints(),
+        (31, 0),
+        "Coinbase output constraints should match the expected values"
+    );
+}
