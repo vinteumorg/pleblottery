@@ -24,8 +24,8 @@ async fn test_template_provider_connection() {
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     let mut pleblottery_service = PlebLotteryService::new(
-        config.mining_server_config.clone().into(),
-        config.template_distribution_config.clone().into(),
+        config.mining_server_config.clone(),
+        config.template_distribution_config.clone(),
         shared_state,
     )
     .unwrap();

@@ -20,8 +20,8 @@ async fn test_connection_with_sv2_minig_device() {
     let shared_state: SharedStateHandle = SharedStateHandle::default();
 
     let mut pleblottery_service = PlebLotteryService::new(
-        config.mining_server_config.clone().into(),
-        config.template_distribution_config.clone().into(),
+        config.mining_server_config.clone(),
+        config.template_distribution_config.clone(),
         shared_state,
     )
     .map_err(|e| format!("Failed to create PlebLotteryService: {}", e))

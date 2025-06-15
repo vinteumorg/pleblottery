@@ -36,8 +36,8 @@ async fn test_shared_state_between_service_and_web() {
     let shared_state: SharedStateHandle = SharedStateHandle::default();
 
     let mut pleblottery_service = PlebLotteryService::new(
-        config.mining_server_config.clone().into(),
-        config.template_distribution_config.clone().into(),
+        config.mining_server_config.clone(),
+        config.template_distribution_config.clone(),
         shared_state.clone(),
     )
     .expect("Failed to create PlebLotteryService");
@@ -62,14 +62,14 @@ async fn test_shared_state_between_service_and_web() {
 
     // Extract the upstream message and parse it as SetNewPrevHash
     let message = tp_sniffer.next_message_from_upstream().unwrap().1;
-    let mut dst = vec![0; u8::from(message.message_type()) as usize];
+    let mut dst = vec![0; message.message_type() as usize];
     let _ = message.clone().to_bytes(&mut dst);
     let set_new_prev_hash = SetNewPrevHash::from_bytes(&mut dst).unwrap();
 
     // Query the web server for the latest prev_hash via the API
     let client = Client::new();
     let resp = client
-        .get(&format!(
+        .get(format!(
             "http://localhost:{}/api/latest-prev-hash",
             config.web_config.listening_port
         ))
@@ -89,16 +89,13 @@ async fn test_shared_state_between_service_and_web() {
     // This tell us that the web server is correctly reflecting the state updated by the SV2 Handlers
 
     assert!(
-        resp_text.contains(&format!(
-            "{}",
-            set_new_prev_hash
+        resp_text.contains(&set_new_prev_hash
                 .prev_hash
                 .to_vec()
                 .iter()
                 .rev()
                 .map(|byte| format!("{:02x}", byte))
-                .collect::<String>()
-        )),
+                .collect::<String>().to_string()),
         "Response does not contain expected prev_hash."
     );
 
@@ -108,21 +105,18 @@ async fn test_shared_state_between_service_and_web() {
     );
 
     assert!(
-        resp_text.contains(&format!("{}", format!("{:02x}", set_new_prev_hash.n_bits))),
+        resp_text.contains(&format!("{:02x}", set_new_prev_hash.n_bits).to_string()),
         "Response does not contain expected n_bits."
     );
 
     assert!(
-        resp_text.contains(&format!(
-            "{}",
-            set_new_prev_hash
+        resp_text.contains(&set_new_prev_hash
                 .target
                 .to_vec()
                 .iter()
                 .rev()
                 .map(|byte| format!("{:02x}", byte))
-                .collect::<String>()
-        )),
+                .collect::<String>().to_string()),
         "Response does not contain expected target."
     );
 
