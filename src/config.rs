@@ -11,6 +11,32 @@ use tower_stratum::key_utils::Secp256k1SecretKey;
 use tower_stratum::server::service::config::Sv2ServerServiceConfig;
 use tower_stratum::server::service::config::Sv2ServerServiceMiningConfig;
 use tower_stratum::server::service::config::Sv2ServerTcpConfig;
+
+// =====================
+// PleblotteryConfig
+// =====================
+#[derive(Clone, Deserialize, Debug)]
+pub struct PleblotteryConfig {
+    pub mining_server_config: PlebLotteryMiningServerConfig,
+    pub template_distribution_config: PlebLotteryTemplateDistributionClientConfig,
+    pub web_config: PlebLotteryWebConfig,
+}
+
+impl PleblotteryConfig {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
+        let contents = fs::read_to_string(path)
+            .map_err(|e| anyhow::anyhow!("Failed to read config file: {}", e))?;
+        let mut config: Self = toml::from_str(&contents)
+            .map_err(|e| anyhow::anyhow!("Failed to parse config file: {}", e))?;
+        config.template_distribution_config.mining_server_config =
+            Some(config.mining_server_config.clone());
+        Ok(config)
+    }
+}
+
+// =====================
+// PlebLotteryMiningServerConfig
+// =====================
 #[derive(Clone, Debug)]
 pub struct PlebLotteryMiningServerConfig {
     pub listening_port: u16,
@@ -68,37 +94,6 @@ impl<'de> Deserialize<'de> for PlebLotteryMiningServerConfig {
     }
 }
 
-#[derive(Clone, Deserialize, Debug)]
-pub struct PlebLotteryTemplateDistributionClientConfig {
-    pub server_addr: SocketAddr,
-    pub auth_pk: Option<Secp256k1PublicKey>,
-    pub mining_server_config: Option<PlebLotteryMiningServerConfig>,
-}
-
-#[derive(Clone, Deserialize, Debug)]
-pub struct PlebLotteryWebConfig {
-    pub listening_port: u16,
-}
-
-#[derive(Clone, Deserialize, Debug)]
-pub struct PleblotteryConfig {
-    pub mining_server_config: PlebLotteryMiningServerConfig,
-    pub template_distribution_config: PlebLotteryTemplateDistributionClientConfig,
-    pub web_config: PlebLotteryWebConfig,
-}
-
-impl PleblotteryConfig {
-    pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
-        let contents = fs::read_to_string(path)
-            .map_err(|e| anyhow::anyhow!("Failed to read config file: {}", e))?;
-        let mut config: Self = toml::from_str(&contents)
-            .map_err(|e| anyhow::anyhow!("Failed to parse config file: {}", e))?;
-        config.template_distribution_config.mining_server_config =
-            Some(config.mining_server_config.clone());
-        Ok(config)
-    }
-}
-
 impl From<PlebLotteryMiningServerConfig> for Sv2ServerServiceConfig {
     fn from(config: PlebLotteryMiningServerConfig) -> Self {
         Sv2ServerServiceConfig {
@@ -120,6 +115,40 @@ impl From<PlebLotteryMiningServerConfig> for Sv2ServerServiceConfig {
             job_declaration_config: None,
             template_distribution_config: None,
         }
+    }
+}
+
+// =====================
+// PlebLotteryTemplateDistributionClientConfig
+// =====================
+#[derive(Clone, Debug)]
+pub struct PlebLotteryTemplateDistributionClientConfig {
+    pub server_addr: SocketAddr,
+    pub auth_pk: Option<Secp256k1PublicKey>,
+    pub mining_server_config: Option<PlebLotteryMiningServerConfig>,
+}
+
+impl<'de> serde::Deserialize<'de> for PlebLotteryTemplateDistributionClientConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        struct Helper {
+            server_addr: SocketAddr,
+            auth_pk: Option<Secp256k1PublicKey>,
+        }
+        let helper = Helper::deserialize(deserializer).map_err(|e| {
+            serde::de::Error::custom(format!(
+                "Failed while parsing [template_distribution_config] section: {e}"
+            ))
+        })?;
+
+        Ok(PlebLotteryTemplateDistributionClientConfig {
+            auth_pk: helper.auth_pk,
+            server_addr: helper.server_addr,
+            mining_server_config: None,
+        })
     }
 }
 
@@ -149,6 +178,17 @@ impl From<PlebLotteryTemplateDistributionClientConfig> for Sv2ClientServiceConfi
     }
 }
 
+// =====================
+// PlebLotteryWebConfig
+// =====================
+#[derive(Clone, Deserialize, Debug)]
+pub struct PlebLotteryWebConfig {
+    pub listening_port: u16,
+}
+
+// =====================
+// Tests
+// =====================
 #[cfg(test)]
 mod tests {
     use super::*;
