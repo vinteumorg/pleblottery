@@ -1,4 +1,4 @@
-use bitcoin::Address;
+use bitcoin::{Address, Amount, TxOut};
 use serde::{Deserialize, Deserializer};
 use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -19,6 +19,21 @@ pub struct PlebLotteryMiningServerConfig {
     pub cert_validity: u64,
     pub inactivity_limit: u64,
     pub coinbase_output_script: bitcoin::ScriptBuf,
+}
+
+impl PlebLotteryMiningServerConfig {
+    // Returns a tuple with (coinbase_output_max_additional_size, coinbase_output_max_additional_sigops).
+    pub fn calculate_coinbase_output_constraints(&self) -> (u32, u16) {
+        let txout = TxOut {
+            value: Amount::ZERO,
+            script_pubkey: self.coinbase_output_script.clone(),
+        };
+
+        (
+            txout.size() as u32,
+            self.coinbase_output_script.count_sigops() as u16,
+        )
+    }
 }
 
 impl<'de> Deserialize<'de> for PlebLotteryMiningServerConfig {
@@ -57,6 +72,7 @@ impl<'de> Deserialize<'de> for PlebLotteryMiningServerConfig {
 pub struct PlebLotteryTemplateDistributionClientConfig {
     pub server_addr: SocketAddr,
     pub auth_pk: Option<Secp256k1PublicKey>,
+    pub mining_server_config: Option<PlebLotteryMiningServerConfig>,
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -75,8 +91,10 @@ impl PleblotteryConfig {
     pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let contents = fs::read_to_string(path)
             .map_err(|e| anyhow::anyhow!("Failed to read config file: {}", e))?;
-        let config: Self = toml::from_str(&contents)
+        let mut config: Self = toml::from_str(&contents)
             .map_err(|e| anyhow::anyhow!("Failed to parse config file: {}", e))?;
+        config.template_distribution_config.mining_server_config =
+            Some(config.mining_server_config.clone());
         Ok(config)
     }
 }
@@ -121,7 +139,10 @@ impl From<PlebLotteryTemplateDistributionClientConfig> for Sv2ClientServiceConfi
             template_distribution_config: Some(Sv2ClientServiceTemplateDistributionConfig {
                 server_addr: config.server_addr,
                 auth_pk: config.auth_pk,
-                coinbase_output_constraints: (1, 1), // todo: fix this
+                coinbase_output_constraints: config
+                    .mining_server_config
+                    .unwrap()
+                    .calculate_coinbase_output_constraints(),
                 setup_connection_flags: 0,
             }),
         }
