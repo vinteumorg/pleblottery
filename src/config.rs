@@ -281,4 +281,31 @@ mod tests {
         let result = std::panic::catch_unwind(|| make_config("this_is_not_a_valid_address"));
         assert!(result.is_err(), "Expected panic for invalid address");
     }
+
+    #[test]
+    fn test_calculate_coinbase_output_constraints() {
+        // P2PKH address
+        let config = make_config("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa");
+        let (size, sigops) = config.calculate_coinbase_output_constraints();
+        assert_eq!(size, 34);
+        assert_eq!(sigops, 1);
+
+        // P2SH address
+        let config = make_config("3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy");
+        let (size, sigops) = config.calculate_coinbase_output_constraints();
+        assert_eq!(size, 32);
+        assert_eq!(sigops, 0);
+
+        // P2WPKH address
+        let config = make_config("bc1qryhgpmfv03qjhhp2dj8nw8g4ewg08jzmgy3cyx");
+        let (size, sigops) = config.calculate_coinbase_output_constraints();
+        assert_eq!(size, 31);
+        assert_eq!(sigops, 0);
+
+        // Taproot address
+        let config = make_config("bc1p2m7q0yn78rjqh200dz0kut5xcxdnfxk4wcsau7zydnrv9ns875eq37vmkz");
+        let (size, sigops) = config.calculate_coinbase_output_constraints();
+        assert_eq!(size, 43);
+        assert_eq!(sigops, 0);
+    }
 }
