@@ -25,6 +25,8 @@ impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionCli
         Poll::Ready(Ok(()))
     }
 
+    async fn shutdown(&mut self) {}
+
     async fn handle_new_template(
         &self,
         template: NewTemplate<'static>,

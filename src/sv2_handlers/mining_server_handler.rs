@@ -104,11 +104,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         self.clients.write().await.remove(&client_id);
     }
 
-    async fn remove_all_clients(&mut self) {
-        info!("Removing all clients");
-
-        self.clients.write().await.clear();
-    }
+    async fn shutdown(&mut self) {}
 
     async fn handle_open_standard_mining_channel(
         &self,
