@@ -6,12 +6,10 @@ use tower_stratum::roles_logic_sv2::channels::server::standard::StandardChannel;
 use tower_stratum::roles_logic_sv2::mining_sv2::{
     CloseChannel, OpenExtendedMiningChannel, OpenMiningChannelError, OpenStandardMiningChannel,
     OpenStandardMiningChannelSuccess, SetCustomMiningJob, SubmitSharesExtended,
-    SubmitSharesStandard, UpdateChannel, MAX_EXTRANONCE_LEN, MESSAGE_TYPE_NEW_EXTENDED_MINING_JOB,
-    MESSAGE_TYPE_NEW_MINING_JOB, MESSAGE_TYPE_OPEN_MINING_CHANNEL_ERROR,
-    MESSAGE_TYPE_OPEN_STANDARD_MINING_CHANNEL_SUCCESS,
+    SubmitSharesStandard, UpdateChannel, MAX_EXTRANONCE_LEN,
 };
 use tower_stratum::roles_logic_sv2::mining_sv2::{
-    ExtendedExtranonce, SetNewPrevHash as SetNewPrevHashMp, MESSAGE_TYPE_MINING_SET_NEW_PREV_HASH,
+    ExtendedExtranonce, SetNewPrevHash as SetNewPrevHashMp,
 };
 use tower_stratum::roles_logic_sv2::parsers::{AnyMessage, Mining};
 use tower_stratum::roles_logic_sv2::template_distribution_sv2::{NewTemplate, SetNewPrevHash};
@@ -216,10 +214,9 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                     return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
                         RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
                             client_id,
-                            messages: vec![(
-                                AnyMessage::Mining(Mining::OpenMiningChannelError(error_message)),
-                                MESSAGE_TYPE_OPEN_MINING_CHANNEL_ERROR,
-                            )],
+                            messages: vec![AnyMessage::Mining(Mining::OpenMiningChannelError(
+                                error_message,
+                            ))],
                         })),
                     )));
                 }
@@ -232,10 +229,9 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                     return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
                         RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
                             client_id,
-                            messages: vec![(
-                                AnyMessage::Mining(Mining::OpenMiningChannelError(error_message)),
-                                MESSAGE_TYPE_OPEN_MINING_CHANNEL_ERROR,
-                            )],
+                            messages: vec![AnyMessage::Mining(Mining::OpenMiningChannelError(
+                                error_message,
+                            ))],
                         })),
                     )));
                 }
@@ -383,20 +379,13 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
             group_channel_id,
         };
 
-        messages.push((
-            AnyMessage::Mining(Mining::OpenStandardMiningChannelSuccess(
-                open_standard_mining_channel_response,
-            )),
-            MESSAGE_TYPE_OPEN_STANDARD_MINING_CHANNEL_SUCCESS,
+        messages.push(AnyMessage::Mining(
+            Mining::OpenStandardMiningChannelSuccess(open_standard_mining_channel_response),
         ));
-        messages.push((
-            AnyMessage::Mining(Mining::NewMiningJob(future_job_message)),
-            MESSAGE_TYPE_NEW_MINING_JOB,
-        ));
-        messages.push((
-            AnyMessage::Mining(Mining::SetNewPrevHash(set_new_prev_hash_mp)),
-            MESSAGE_TYPE_MINING_SET_NEW_PREV_HASH,
-        ));
+        messages.push(AnyMessage::Mining(Mining::NewMiningJob(future_job_message)));
+        messages.push(AnyMessage::Mining(Mining::SetNewPrevHash(
+            set_new_prev_hash_mp,
+        )));
 
         info!(
             "Opened standard mining channel with id: {} for client: {}",
@@ -523,12 +512,9 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                             RequestToSv2ServerError::MiningHandlerError(format!("Error getting future job for template {:?} for group channel {:?}", template.template_id, group_channel.get_group_channel_id()))
                         })?;
 
-                        let group_extended_job = (
-                            AnyMessage::Mining(Mining::NewExtendedMiningJob(
-                                future_job.get_job_message().clone(),
-                            )),
-                            MESSAGE_TYPE_NEW_EXTENDED_MINING_JOB,
-                        );
+                        let group_extended_job = AnyMessage::Mining(Mining::NewExtendedMiningJob(
+                            future_job.get_job_message().clone(),
+                        ));
 
                         info!("Sending future NewExtendedMiningJob message to channel {} of client {:?} for job id {:?}", group_channel.get_group_channel_id(), client_id, future_job_id);
                         messages_to_client.push(group_extended_job);
@@ -572,12 +558,9 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                             ))
                         })?;
 
-                        let future_standard_job = (
-                            AnyMessage::Mining(Mining::NewMiningJob(
-                                future_job.get_job_message().clone(),
-                            )),
-                            MESSAGE_TYPE_NEW_MINING_JOB,
-                        );
+                        let future_standard_job = AnyMessage::Mining(Mining::NewMiningJob(
+                            future_job.get_job_message().clone(),
+                        ));
 
                         info!("Sending future NewMiningJob message to channel {} of client {:?} for job id {:?}", standard_channel.get_channel_id(), client_id, future_job_id);
                         messages_to_client.push(future_standard_job);
@@ -613,12 +596,9 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                             ))
                         })?;
 
-                        let group_extended_job = (
-                            AnyMessage::Mining(Mining::NewExtendedMiningJob(
-                                active_job.get_job_message().clone(),
-                            )),
-                            MESSAGE_TYPE_NEW_EXTENDED_MINING_JOB,
-                        );
+                        let group_extended_job = AnyMessage::Mining(Mining::NewExtendedMiningJob(
+                            active_job.get_job_message().clone(),
+                        ));
 
                         info!("Sending non-future NewExtendedMiningJob message to channel {} of client {:?} for job id {:?}", group_channel.get_group_channel_id(), client_id, active_job.get_job_id());
                         messages_to_client.push(group_extended_job);
@@ -644,12 +624,9 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                                 standard_channel.get_channel_id()
                             ))
                         })?;
-                        let standard_job = (
-                            AnyMessage::Mining(Mining::NewMiningJob(
-                                active_job.get_job_message().clone(),
-                            )),
-                            MESSAGE_TYPE_NEW_MINING_JOB,
-                        );
+                        let standard_job = AnyMessage::Mining(Mining::NewMiningJob(
+                            active_job.get_job_message().clone(),
+                        ));
                         info!("Sending non-future NewMiningJob message to channel {} of client {:?} for job id {:?}", standard_channel.get_channel_id(), client_id, active_job.get_job_id());
                         messages_to_client.push(standard_job);
                     }
@@ -745,10 +722,8 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                     nbits: prev_hash.n_bits,
                 };
 
-                let set_new_prev_hash_mp = (
-                    AnyMessage::Mining(Mining::SetNewPrevHash(set_new_prev_hash_mp)),
-                    MESSAGE_TYPE_MINING_SET_NEW_PREV_HASH,
-                );
+                let set_new_prev_hash_mp =
+                    AnyMessage::Mining(Mining::SetNewPrevHash(set_new_prev_hash_mp));
 
                 info!(
                     "Sending SetNewPrevHash message to channel {} of client {:?} for job id {:?}",
@@ -796,10 +771,8 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                     nbits: prev_hash.n_bits,
                 };
 
-                let set_new_prev_hash_mp = (
-                    AnyMessage::Mining(Mining::SetNewPrevHash(set_new_prev_hash_mp)),
-                    MESSAGE_TYPE_MINING_SET_NEW_PREV_HASH,
-                );
+                let set_new_prev_hash_mp =
+                    AnyMessage::Mining(Mining::SetNewPrevHash(set_new_prev_hash_mp));
 
                 info!(
                     "Sending SetNewPrevHash message to channel {} of client {:?} for job id {:?}",
