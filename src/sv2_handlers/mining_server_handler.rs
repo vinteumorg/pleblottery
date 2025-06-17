@@ -1,18 +1,25 @@
 use tokio::sync::{Mutex, RwLock};
+use tower_stratum::client::service::request::RequestToSv2Client;
+use tower_stratum::client::service::subprotocols::template_distribution::trigger::TemplateDistributionClientTrigger;
 use tower_stratum::roles_logic_sv2::channels::server::error::StandardChannelError;
 use tower_stratum::roles_logic_sv2::channels::server::extended::ExtendedChannel;
 use tower_stratum::roles_logic_sv2::channels::server::group::GroupChannel;
+use tower_stratum::roles_logic_sv2::channels::server::share_accounting::{
+    ShareValidationError, ShareValidationResult,
+};
 use tower_stratum::roles_logic_sv2::channels::server::standard::StandardChannel;
 use tower_stratum::roles_logic_sv2::mining_sv2::{
     CloseChannel, OpenExtendedMiningChannel, OpenMiningChannelError, OpenStandardMiningChannel,
-    OpenStandardMiningChannelSuccess, SetCustomMiningJob, SubmitSharesExtended,
-    SubmitSharesStandard, UpdateChannel, MAX_EXTRANONCE_LEN,
+    OpenStandardMiningChannelSuccess, SetCustomMiningJob, SubmitSharesError, SubmitSharesExtended,
+    SubmitSharesStandard, SubmitSharesSuccess, UpdateChannel, MAX_EXTRANONCE_LEN,
 };
 use tower_stratum::roles_logic_sv2::mining_sv2::{
     ExtendedExtranonce, SetNewPrevHash as SetNewPrevHashMp,
 };
 use tower_stratum::roles_logic_sv2::parsers::{AnyMessage, Mining};
-use tower_stratum::roles_logic_sv2::template_distribution_sv2::{NewTemplate, SetNewPrevHash};
+use tower_stratum::roles_logic_sv2::template_distribution_sv2::{
+    NewTemplate, SetNewPrevHash, SubmitSolution,
+};
 use tower_stratum::roles_logic_sv2::utils::Id as IdFactory;
 use tower_stratum::server::service::client::Sv2MessagesToClient;
 use tower_stratum::server::service::request::RequestToSv2Server;
@@ -429,11 +436,216 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
 
     async fn handle_submit_shares_standard(
         &self,
-        _client_id: u32,
-        _m: SubmitSharesStandard,
+        client_id: u32,
+        m: SubmitSharesStandard,
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
         info!("Received SubmitSharesStandard message");
-        Ok(ResponseFromSv2Server::Ok)
+        let clients_guard = self.clients.read().await;
+        let client = match clients_guard.get(&client_id) {
+            Some(client) => client,
+            None => {
+                error!("Client with id {} not found", client_id);
+                return Err(RequestToSv2ServerError::IdNotFound);
+            }
+        };
+
+        let client_guard = client.read().await;
+        let standard_channels_arc = &client_guard.standard_channels;
+        let std_channels_guard = standard_channels_arc.read().await;
+        let standard_channel_arc = match std_channels_guard.get(&m.channel_id) {
+            Some(channel) => channel,
+            None => {
+                error!("SubmitSharesError: channel_id: {}, sequence_number: {}, error_code: invalid-channel-id ❌", m.channel_id, m.sequence_number);
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id,
+                        messages: vec![AnyMessage::Mining(Mining::SubmitSharesError(
+                            SubmitSharesError {
+                                channel_id: m.channel_id,
+                                sequence_number: m.sequence_number,
+                                error_code: "invalid-channel-id"
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+        };
+
+        let mut standard_channel = standard_channel_arc.write().await;
+        let share_validation_result = standard_channel.validate_share(m.clone());
+
+        match share_validation_result {
+            Ok(ShareValidationResult::Valid) => {
+                info!(
+                    "SubmitSharesStandard: valid share | channel_id: {}, sequence_number: {} ☑️",
+                    m.channel_id, m.sequence_number
+                );
+                return Ok(ResponseFromSv2Server::Ok);
+            }
+            Ok(ShareValidationResult::ValidWithAcknowledgement(
+                last_sequence_number,
+                new_submits_accepted_count,
+                new_shares_sum,
+            )) => {
+                let success = SubmitSharesSuccess {
+                    channel_id: m.channel_id,
+                    last_sequence_number,
+                    new_submits_accepted_count,
+                    new_shares_sum,
+                };
+                info!("SubmitSharesExtended: {:?} ✅", success);
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id,
+                        messages: vec![AnyMessage::Mining(Mining::SubmitSharesSuccess(success))],
+                    })),
+                )));
+            }
+            Ok(ShareValidationResult::BlockFound(template_id, coinbase)) => {
+                info!("SubmitSharesStandard: 💰 Block Found!!! 💰");
+                let template_id = template_id
+                    .expect("Pleblottery does not support custom jobs. Something weird happened.");
+
+                info!("SubmitSharesStandard: Propagating solution to the Template Provider.");
+
+                let share_accounting = standard_channel.get_share_accounting();
+
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::MultipleRequests(Box::new(vec![
+                        RequestToSv2Server::SendRequestToSiblingClientService(Box::new(
+                            RequestToSv2Client::TemplateDistributionTrigger(
+                                TemplateDistributionClientTrigger::SubmitSolution(SubmitSolution {
+                                    template_id,
+                                    version: m.version,
+                                    header_timestamp: m.ntime,
+                                    header_nonce: m.nonce,
+                                    coinbase_tx: coinbase
+                                        .try_into()
+                                        .expect("coinbase tx must be valid"),
+                                }),
+                            ),
+                        )),
+                        RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                            client_id,
+                            messages: vec![AnyMessage::Mining(Mining::SubmitSharesSuccess(
+                                SubmitSharesSuccess {
+                                    channel_id: m.channel_id,
+                                    last_sequence_number: share_accounting
+                                        .get_last_share_sequence_number(),
+                                    new_submits_accepted_count: share_accounting
+                                        .get_shares_accepted(),
+                                    new_shares_sum: share_accounting.get_share_work_sum(),
+                                },
+                            ))],
+                        })),
+                    ])),
+                )));
+            }
+            Err(ShareValidationError::Invalid) => {
+                error!("SubmitSharesError: channel_id: {}, sequence_number: {}, error_code: invalid-share ❌", m.channel_id, m.sequence_number);
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id,
+                        messages: vec![AnyMessage::Mining(Mining::SubmitSharesError(
+                            SubmitSharesError {
+                                channel_id: m.channel_id,
+                                sequence_number: m.sequence_number,
+                                error_code: "invalid-share"
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+            Err(ShareValidationError::Stale) => {
+                error!("SubmitSharesError: channel_id: {}, sequence_number: {}, error_code: stale-share ❌", m.channel_id, m.sequence_number);
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id,
+                        messages: vec![AnyMessage::Mining(Mining::SubmitSharesError(
+                            SubmitSharesError {
+                                channel_id: m.channel_id,
+                                sequence_number: m.sequence_number,
+                                error_code: "stale-share"
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+            Err(ShareValidationError::InvalidJobId) => {
+                error!("SubmitSharesError: channel_id: {}, sequence_number: {}, error_code: invalid-job-id ❌", m.channel_id, m.sequence_number);
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id,
+                        messages: vec![AnyMessage::Mining(Mining::SubmitSharesError(
+                            SubmitSharesError {
+                                channel_id: m.channel_id,
+                                sequence_number: m.sequence_number,
+                                error_code: "invalid-job-id"
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+            Err(ShareValidationError::DoesNotMeetTarget) => {
+                error!("SubmitSharesError: channel_id: {}, sequence_number: {}, error_code: difficulty-too-low ❌", m.channel_id, m.sequence_number);
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id,
+                        messages: vec![AnyMessage::Mining(Mining::SubmitSharesError(
+                            SubmitSharesError {
+                                channel_id: m.channel_id,
+                                sequence_number: m.sequence_number,
+                                error_code: "difficulty-too-low"
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+            Err(ShareValidationError::DuplicateShare) => {
+                error!("SubmitSharesError: channel_id: {}, sequence_number: {}, error_code: duplicate-share ❌", m.channel_id, m.sequence_number);
+
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id,
+                        messages: vec![AnyMessage::Mining(Mining::SubmitSharesError(
+                            SubmitSharesError {
+                                channel_id: m.channel_id,
+                                sequence_number: m.sequence_number,
+                                error_code: "duplicate-share"
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+            _ => {
+                error!(
+                    "Unhandled share validation result for client: {}",
+                    client_id
+                );
+                return Err(RequestToSv2ServerError::MiningHandlerError(format!(
+                    "Unhandled share validation result for client: {}",
+                    client_id
+                )));
+            }
+        }
     }
 
     async fn handle_submit_shares_extended(
