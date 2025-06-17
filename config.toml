@@ -5,6 +5,9 @@ priv_key = "mkDLTBBRxdBv998612qipDYoTK3YUrqLe8uWw7gu3iXbSrn2n"
 cert_validity = 3600
 inactivity_limit = 3600
 coinbase_output_address = "tb1qw8rnkgnk7s48h6w5c0mg7we7gvzykeyp2sze82"
+coinbase_tag = "pleblottery"
+share_batch_size = 10
+expected_shares_per_minute = 10.0
 
 [template_distribution_config]
 server_addr = "127.0.0.1:8442"

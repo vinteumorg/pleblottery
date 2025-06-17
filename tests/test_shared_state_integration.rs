@@ -89,13 +89,16 @@ async fn test_shared_state_between_service_and_web() {
     // This tell us that the web server is correctly reflecting the state updated by the SV2 Handlers
 
     assert!(
-        resp_text.contains(&set_new_prev_hash
+        resp_text.contains(
+            &set_new_prev_hash
                 .prev_hash
                 .to_vec()
                 .iter()
                 .rev()
                 .map(|byte| format!("{:02x}", byte))
-                .collect::<String>().to_string()),
+                .collect::<String>()
+                .to_string()
+        ),
         "Response does not contain expected prev_hash."
     );
 
@@ -110,13 +113,16 @@ async fn test_shared_state_between_service_and_web() {
     );
 
     assert!(
-        resp_text.contains(&set_new_prev_hash
+        resp_text.contains(
+            &set_new_prev_hash
                 .target
                 .to_vec()
                 .iter()
                 .rev()
                 .map(|byte| format!("{:02x}", byte))
-                .collect::<String>().to_string()),
+                .collect::<String>()
+                .to_string()
+        ),
         "Response does not contain expected target."
     );
 

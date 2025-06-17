@@ -36,6 +36,9 @@ impl PlebLotteryService {
         let mining_server_handler = PlebLotteryMiningServerHandler::new(
             shared_state,
             mining_server_config.coinbase_output_script,
+            mining_server_config.coinbase_tag,
+            mining_server_config.share_batch_size,
+            mining_server_config.expected_shares_per_minute,
         );
         let template_distribution_client_handler =
             PlebLotteryTemplateDistributionClientHandler::default();

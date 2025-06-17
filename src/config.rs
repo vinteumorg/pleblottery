@@ -19,6 +19,9 @@ pub struct PlebLotteryMiningServerConfig {
     pub cert_validity: u64,
     pub inactivity_limit: u64,
     pub coinbase_output_script: bitcoin::ScriptBuf,
+    pub coinbase_tag: String,
+    pub share_batch_size: usize,
+    pub expected_shares_per_minute: f32,
 }
 
 impl<'de> Deserialize<'de> for PlebLotteryMiningServerConfig {
@@ -34,10 +37,19 @@ impl<'de> Deserialize<'de> for PlebLotteryMiningServerConfig {
             cert_validity: u64,
             inactivity_limit: u64,
             coinbase_output_address: String,
+            coinbase_tag: String,
+            share_batch_size: usize,
+            expected_shares_per_minute: f32,
         }
         let helper = Helper::deserialize(deserializer).map_err(|e| {
             serde::de::Error::custom(format!("Failed to deserialize mining server config: {e}"))
         })?;
+
+        if helper.coinbase_tag.len() > 11 {
+            return Err(serde::de::Error::custom(
+                "coinbase_tag must have at most 11 characters",
+            ));
+        }
 
         let address = Address::from_str(&helper.coinbase_output_address)
             .map_err(|e| serde::de::Error::custom(format!("Invalid coinbase output address: {e}")))?
@@ -49,6 +61,9 @@ impl<'de> Deserialize<'de> for PlebLotteryMiningServerConfig {
             cert_validity: helper.cert_validity,
             inactivity_limit: helper.inactivity_limit,
             coinbase_output_script: address.script_pubkey(),
+            coinbase_tag: helper.coinbase_tag,
+            share_batch_size: helper.share_batch_size,
+            expected_shares_per_minute: helper.expected_shares_per_minute,
         })
     }
 }
@@ -149,6 +164,9 @@ mod tests {
             cert_validity: 3600,
             inactivity_limit: 300,
             coinbase_output_script: address.script_pubkey(),
+            coinbase_tag: "test".to_string(),
+            share_batch_size: 10,
+            expected_shares_per_minute: 1.0,
         }
     }
 

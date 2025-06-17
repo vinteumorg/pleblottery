@@ -57,6 +57,9 @@ pub fn load_config() -> PleblotteryConfig {
             .unwrap()
             .assume_checked()
             .script_pubkey(),
+            coinbase_tag: "pleblottery".to_string(),
+            share_batch_size: 10,
+            expected_shares_per_minute: 1.0,
         },
         template_distribution_config: PlebLotteryTemplateDistributionClientConfig {
             server_addr: "127.0.0.1:8442".parse().expect("Invalid server address"),
