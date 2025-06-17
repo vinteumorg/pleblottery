@@ -2,8 +2,13 @@ use std::vec;
 
 use integration_tests_sv2::*;
 use pleblottery::{service::PlebLotteryService, state::SharedStateHandle};
-use tower_stratum::roles_logic_sv2::common_messages_sv2::{
-    MESSAGE_TYPE_SETUP_CONNECTION, MESSAGE_TYPE_SETUP_CONNECTION_SUCCESS,
+use tower_stratum::roles_logic_sv2::{
+    common_messages_sv2::{MESSAGE_TYPE_SETUP_CONNECTION, MESSAGE_TYPE_SETUP_CONNECTION_SUCCESS},
+    mining_sv2::{
+        MESSAGE_TYPE_MINING_SET_NEW_PREV_HASH, MESSAGE_TYPE_NEW_MINING_JOB,
+        MESSAGE_TYPE_OPEN_STANDARD_MINING_CHANNEL,
+        MESSAGE_TYPE_OPEN_STANDARD_MINING_CHANNEL_SUCCESS,
+    },
 };
 
 mod common;
@@ -54,6 +59,34 @@ async fn test_connection_with_sv2_minig_device() {
         .wait_for_message_type(
             interceptor::MessageDirection::ToDownstream,
             MESSAGE_TYPE_SETUP_CONNECTION_SUCCESS,
+        )
+        .await;
+
+    sniffer
+        .wait_for_message_type(
+            interceptor::MessageDirection::ToUpstream,
+            MESSAGE_TYPE_OPEN_STANDARD_MINING_CHANNEL,
+        )
+        .await;
+
+    sniffer
+        .wait_for_message_type(
+            interceptor::MessageDirection::ToDownstream,
+            MESSAGE_TYPE_OPEN_STANDARD_MINING_CHANNEL_SUCCESS,
+        )
+        .await;
+
+    sniffer
+        .wait_for_message_type(
+            interceptor::MessageDirection::ToDownstream,
+            MESSAGE_TYPE_NEW_MINING_JOB,
+        )
+        .await;
+
+    sniffer
+        .wait_for_message_type(
+            interceptor::MessageDirection::ToDownstream,
+            MESSAGE_TYPE_MINING_SET_NEW_PREV_HASH,
         )
         .await;
 
