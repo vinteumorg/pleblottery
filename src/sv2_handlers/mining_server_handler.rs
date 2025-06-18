@@ -268,14 +268,27 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
 
         // Get last activated future template
         let last_activated_future_template_guard = self.last_activated_future_template.read().await;
-        let last_activated_future_template = (*last_activated_future_template_guard)
-            .clone()
-            .ok_or_else(|| {
-                error!("No last activated future template available");
-                RequestToSv2ServerError::MiningHandlerError(
-                    "No last activated future template available".to_string(),
-                )
-            })?;
+        let last_activated_future_template = (*last_activated_future_template_guard).clone();
+        let last_activated_future_template = match last_activated_future_template {
+            Some(template) => template,
+            None => {
+                error!("Unable to open standard mining channel with client {}: No last activated future template available", client_id);
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id: client_id,
+                        messages: vec![AnyMessage::Mining(Mining::OpenMiningChannelError(
+                            OpenMiningChannelError {
+                                request_id: m.get_request_id_as_u32(),
+                                error_code: "not-ready-to-open-channel" //note: non-standard error code
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+        };
         let coinbase_tx_value_remaining =
             last_activated_future_template.coinbase_tx_value_remaining;
         let coinbase_output = TxOut {
@@ -330,10 +343,27 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         let future_job_message = future_standard_job.get_job_message().clone();
 
         // Call on_set_new_prev_hash on the standard channel before moving it
-        let last_prev_hash = self.last_prev_hash.read().await.clone().ok_or_else(|| {
-            error!("No last prev hash available");
-            RequestToSv2ServerError::MiningHandlerError("No last prev hash available".to_string())
-        })?;
+        let last_prev_hash = self.last_prev_hash.read().await.clone();
+        let last_prev_hash = match last_prev_hash {
+            Some(prev_hash) => prev_hash,
+            None => {
+                error!("Unable to open standard mining channel with client {}: No last activated prev hash available", client_id);
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id: client_id,
+                        messages: vec![AnyMessage::Mining(Mining::OpenMiningChannelError(
+                            OpenMiningChannelError {
+                                request_id: m.get_request_id_as_u32(),
+                                error_code: "not-ready-to-open-channel" //note: non-standard error code
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+        };
         standard_channel
             .on_set_new_prev_hash(last_prev_hash.clone())
             .map_err(|e| {
