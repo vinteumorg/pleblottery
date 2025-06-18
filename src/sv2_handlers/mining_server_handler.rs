@@ -110,7 +110,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
     }
 
     async fn add_client(&mut self, client_id: u32, flags: u32) {
-        info!("Adding client with id: {}, flags: {}", client_id, flags);
+        info!("Adding client with id: {}, flags: {:04b}", client_id, flags);
 
         let mut channel_id_factory = IdFactory::new();
 
