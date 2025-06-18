@@ -3178,7 +3178,7 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 [[package]]
 name = "tower-stratum"
 version = "0.1.0"
-source = "git+https://github.com/plebhash/tower-stratum.git?branch=sri-main#30bf564b881c3cd161bb493738f18c8ecb8eb134"
+source = "git+https://github.com/plebhash/tower-stratum.git?branch=sri-main#207f9a1722c16fbad743d6e9aa9bdd93ab7e469c"
 dependencies = [
  "async-channel",
  "binary_codec_sv2",

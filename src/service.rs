@@ -46,7 +46,7 @@ impl PlebLotteryService {
         let (server_service, sibling_server_io) =
             Sv2ServerService::new_with_sibling_io(server_config.clone(), mining_server_handler)
                 .map_err(|_| anyhow::anyhow!("Failed to create server service"))?;
-        let client_service = Sv2ClientService::new_with_sibling_io(
+        let client_service = Sv2ClientService::new_from_sibling_io(
             client_config.clone(),
             NullSv2MiningClientHandler,
             template_distribution_client_handler,
