@@ -147,6 +147,10 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         self.clients.write().await.remove(&client_id);
     }
 
+    async fn start(&mut self) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
+        Ok(ResponseFromSv2Server::Ok)
+    }
+
     async fn shutdown(&mut self) {}
 
     async fn handle_open_standard_mining_channel(
