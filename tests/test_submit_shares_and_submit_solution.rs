@@ -1,0 +1,87 @@
+use std::vec;
+
+use integration_tests_sv2::*;
+use pleblottery::{service::PlebLotteryService, state::SharedStateHandle};
+use tower_stratum::roles_logic_sv2::mining_sv2::{
+    MESSAGE_TYPE_SUBMIT_SHARES_STANDARD, MESSAGE_TYPE_SUBMIT_SHARES_SUCCESS,
+};
+use tower_stratum::roles_logic_sv2::template_distribution_sv2::{
+    MESSAGE_TYPE_NEW_TEMPLATE, MESSAGE_TYPE_SET_NEW_PREV_HASH, MESSAGE_TYPE_SUBMIT_SOLUTION,
+};
+
+mod common;
+use common::load_config;
+
+#[tokio::test]
+async fn test_submit_share_and_submit_solution() {
+    start_tracing();
+    let (_tp, tp_address) = start_template_provider(None);
+    let (tp_sniffer, tp_sniffer_addr) = start_sniffer("tp pleblottery", tp_address, false, vec![]);
+
+    let mut config = load_config();
+    config.template_distribution_config.server_addr = tp_sniffer_addr;
+
+    // Set a high expected shares per minute to ensure we can submit shares quickly
+    config.mining_server_config.expected_shares_per_minute = 100.0;
+
+    // Give sniffer time to initialize
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    let shared_state: SharedStateHandle = pleblottery::state::SharedStateHandle::default();
+
+    let mut pleblottery_service = PlebLotteryService::new(
+        config.mining_server_config.clone(),
+        config.template_distribution_config.clone(),
+        shared_state,
+    )
+    .unwrap();
+
+    pleblottery_service.start().await.unwrap();
+
+    let pleblottery_address = format!("0.0.0.0:{}", config.mining_server_config.listening_port);
+
+    let (sniffer, sniffer_address) = start_sniffer(
+        "sv2_device pleblottery",
+        pleblottery_address.parse().unwrap(),
+        false,
+        vec![],
+    );
+
+    tp_sniffer
+        .wait_for_message_type(
+            interceptor::MessageDirection::ToDownstream,
+            MESSAGE_TYPE_NEW_TEMPLATE,
+        )
+        .await;
+
+    tp_sniffer
+        .wait_for_message_type(
+            interceptor::MessageDirection::ToDownstream,
+            MESSAGE_TYPE_SET_NEW_PREV_HASH,
+        )
+        .await;
+
+    start_mining_device_sv2(sniffer_address, None, None, None, 1, None, true);
+
+    sniffer
+        .wait_for_message_type(
+            interceptor::MessageDirection::ToUpstream,
+            MESSAGE_TYPE_SUBMIT_SHARES_STANDARD,
+        )
+        .await;
+
+    tp_sniffer
+        .wait_for_message_type(
+            interceptor::MessageDirection::ToUpstream,
+            MESSAGE_TYPE_SUBMIT_SOLUTION,
+        )
+        .await;
+
+    sniffer
+        .wait_for_message_type(
+            interceptor::MessageDirection::ToDownstream,
+            MESSAGE_TYPE_SUBMIT_SHARES_SUCCESS,
+        )
+        .await;
+    pleblottery_service.shutdown().await.unwrap();
+}
