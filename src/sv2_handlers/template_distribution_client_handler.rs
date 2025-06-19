@@ -2,6 +2,7 @@ use anyhow::Result;
 use tower_stratum::client::service::request::{RequestToSv2Client, RequestToSv2ClientError};
 use tower_stratum::client::service::response::ResponseFromSv2Client;
 use tower_stratum::client::service::subprotocols::template_distribution::handler::Sv2TemplateDistributionClientHandler;
+use tower_stratum::client::service::subprotocols::template_distribution::trigger::TemplateDistributionClientTrigger;
 use tower_stratum::roles_logic_sv2::template_distribution_sv2::{
     NewTemplate, RequestTransactionDataError, RequestTransactionDataSuccess, SetNewPrevHash,
 };
@@ -15,9 +16,24 @@ use tokio::sync::RwLock;
 
 use crate::utils::bip34_block_height;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct PlebLotteryTemplateDistributionClientHandler {
     current_height: Arc<RwLock<u64>>,
+    coinbase_output_max_additional_size: u32,
+    coinbase_output_max_additional_sigops: u16,
+}
+
+impl PlebLotteryTemplateDistributionClientHandler {
+    pub fn new(
+        coinbase_output_max_additional_size: u32,
+        coinbase_output_max_additional_sigops: u16,
+    ) -> Self {
+        Self {
+            current_height: Arc::new(RwLock::new(0)),
+            coinbase_output_max_additional_size,
+            coinbase_output_max_additional_sigops,
+        }
+    }
 }
 
 impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionClientHandler {
@@ -26,7 +42,14 @@ impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionCli
     }
 
     async fn start(&mut self) -> Result<ResponseFromSv2Client<'static>, RequestToSv2ClientError> {
-        Ok(ResponseFromSv2Client::Ok)
+        Ok(ResponseFromSv2Client::TriggerNewRequest(Box::new(
+            RequestToSv2Client::TemplateDistributionTrigger(
+                TemplateDistributionClientTrigger::SetCoinbaseOutputConstraints(
+                    self.coinbase_output_max_additional_size,
+                    self.coinbase_output_max_additional_sigops,
+                ),
+            ),
+        )))
     }
 
     async fn shutdown(&mut self) {}
