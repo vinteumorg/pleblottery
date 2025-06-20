@@ -68,12 +68,14 @@ impl PlebLotteryMiningServerHandler {
     ) -> Self {
         let range_0 = std::ops::Range { start: 0, end: 0 };
 
+        let full_coinbase_tag = format!("pleblottery {}", coinbase_tag);
+
         let range_1 = std::ops::Range {
             start: 0,
-            end: coinbase_tag.len() + 8,
+            end: full_coinbase_tag.len() + 8,
         };
         let range_2 = std::ops::Range {
-            start: coinbase_tag.len() + 8,
+            start: full_coinbase_tag.len() + 8,
             end: MAX_EXTRANONCE_LEN,
         };
         let clients = Arc::new(RwLock::new(HashMap::new()));
@@ -90,7 +92,7 @@ impl PlebLotteryMiningServerHandler {
                     range_0,
                     range_1,
                     range_2,
-                    Some(coinbase_tag.as_bytes().to_vec()),
+                    Some(full_coinbase_tag.as_bytes().to_vec()),
                 )
                 .expect("valid ExtendedExtranonce must not fail"),
             )),

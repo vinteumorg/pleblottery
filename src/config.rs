@@ -45,9 +45,9 @@ impl<'de> Deserialize<'de> for PlebLotteryMiningServerConfig {
             serde::de::Error::custom(format!("Failed to deserialize mining server config: {e}"))
         })?;
 
-        if helper.coinbase_tag.len() > 11 {
+        if helper.coinbase_tag.len() > 8 {
             return Err(serde::de::Error::custom(
-                "coinbase_tag must have at most 11 characters",
+                "coinbase_tag must have at most 8 characters",
             ));
         }
 

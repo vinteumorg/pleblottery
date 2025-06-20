@@ -6,7 +6,7 @@ priv_key = "zmBEmPhqo3A92FkiLVvyCz6htc3e53ph3ZbD4ASqGaLjwnFLi"
 cert_validity = 3600
 inactivity_limit = 300
 coinbase_output_address = "not_a_real_address"
-coinbase_tag = "pleblottery"
+coinbase_tag = "username"
 share_batch_size = 10
 expected_shares_per_minute = 1.0
 
