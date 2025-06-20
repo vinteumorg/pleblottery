@@ -59,7 +59,7 @@ pub struct PlebLotteryMiningServerHandler {
 }
 
 impl PlebLotteryMiningServerHandler {
-    pub fn new(
+    pub async fn new(
         shared_state: SharedStateHandle,
         coinbase_output_script: bitcoin::ScriptBuf,
         coinbase_tag: String,
@@ -76,9 +76,11 @@ impl PlebLotteryMiningServerHandler {
             start: coinbase_tag.len() + 8,
             end: MAX_EXTRANONCE_LEN,
         };
+        let clients = Arc::new(RwLock::new(HashMap::new()));
+        shared_state.write().await.clients = clients.clone();
         Self {
+            clients,
             shared_state,
-            clients: Arc::new(RwLock::new(HashMap::new())),
             coinbase_output_script,
             future_templates: Arc::new(RwLock::new(HashMap::new())),
             last_activated_future_template: Arc::new(RwLock::new(None)),
@@ -139,12 +141,36 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
             .write()
             .await
             .insert(client_id, Arc::new(RwLock::new(client)));
+
+        {
+            let total_clients = self.clients.read().await.len() as u32;
+            let mut state = self.shared_state.write().await;
+            state.total_clients = total_clients;
+        }
     }
 
     async fn remove_client(&mut self, client_id: u32) {
         info!("Removing client with id: {}", client_id);
 
+        let hashrate = {
+            let mut hash = 0.0;
+            let clients_guard = self.clients.read().await;
+            let client = clients_guard.get(&client_id).unwrap();
+            let client_guard = client.read().await;
+            let std_channels = client_guard.standard_channels.read().await;
+            for (_, channel) in std_channels.iter() {
+                hash += channel.read().await.get_nominal_hashrate();
+            }
+            hash
+        };
         self.clients.write().await.remove(&client_id);
+
+        {
+            let total_clients = self.clients.read().await.len() as u32;
+            let mut state = self.shared_state.write().await;
+            state.total_clients = total_clients;
+            state.total_hashrate -= hashrate;
+        }
     }
 
     async fn start(&mut self) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
@@ -390,6 +416,8 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
             nbits: last_prev_hash.n_bits,
         };
 
+        let nominal_hashrate = standard_channel.get_nominal_hashrate();
+
         // Register the new standard channel
         let client_guard = client.read().await;
         let std_channels_arc = &client_guard.standard_channels;
@@ -419,6 +447,11 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
             extranonce_prefix,
             group_channel_id,
         };
+
+        {
+            let mut state = self.shared_state.write().await;
+            state.total_hashrate += nominal_hashrate;
+        }
 
         messages.push(AnyMessage::Mining(
             Mining::OpenStandardMiningChannelSuccess(open_standard_mining_channel_response),
@@ -517,6 +550,10 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                     "SubmitSharesStandard: valid share | channel_id: {}, sequence_number: {} ☑️",
                     m.channel_id, m.sequence_number
                 );
+                {
+                    let mut state = self.shared_state.write().await;
+                    state.total_shares_submitted += 1;
+                }
                 return Ok(ResponseFromSv2Server::Ok);
             }
             Ok(ShareValidationResult::ValidWithAcknowledgement(
@@ -531,6 +568,18 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                     new_shares_sum,
                 };
                 info!("SubmitSharesExtended: {:?} ✅", success);
+
+                {
+                    let share_accounting = standard_channel.get_share_accounting();
+                    let mut state = self.shared_state.write().await;
+                    let best_share = share_accounting.get_best_diff();
+                    state.best_share = if best_share > state.best_share {
+                        best_share
+                    } else {
+                        state.best_share
+                    };
+                    state.total_shares_submitted += 1;
+                }
                 return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
                     RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
                         client_id,

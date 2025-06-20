@@ -177,6 +177,95 @@ pub async fn get_latest_prev_hash(State(shared_state): State<SharedStateHandle>)
     Html(rows)
 }
 
+pub async fn get_mining_stats(State(shared_state): State<SharedStateHandle>) -> Html<String> {
+    let state = shared_state.read().await;
+    let mut rows = String::new();
+
+    if let Some(_) = &state.latest_prev_hash {
+        rows.push_str(&format!(
+            r#"
+                <tr>
+                    <td>Total Clients</td>
+                    <td>{}</td>
+                </tr>
+                <tr>
+                    <td>Total shares</td>
+                    <td>{}</td>
+                </tr>
+                <tr>
+                    <td>Best Share</td>
+                    <td>{}</td>
+                </tr>
+                <tr>
+                    <td>Total Hashrate</td>
+                    <td>{}</td>
+                </tr>
+            "#,
+            state.total_clients,
+            state.total_shares_submitted,
+            state.format_best_share(),
+            state.format_hashrate()
+        ));
+    } else {
+        rows.push_str(
+            r#"<tr>
+                <td colspan="4">No mining stats available</td>
+            </tr>"#,
+        );
+    }
+
+    Html(rows)
+}
+
+pub async fn get_clients_stats(State(shared_state): State<SharedStateHandle>) -> Html<String> {
+    let state = shared_state.read().await;
+    let mut rows = String::new();
+
+    if state.clients.read().await.len() > 0 as usize {
+        let clients = state.clients.read().await;
+        for (_, client) in clients.iter() {
+            let client = client.read().await;
+            rows.push_str(&format!(
+                r#"
+                <table class="tg">
+                    <tr>
+                        <th>Client ID</th>
+                        <td>{}</td>
+                    </tr>
+                    <tr>
+                        <th>Connection Flags</th>
+                        <td>{:04b}</td>
+                </tr>
+                <tr>
+                    <th>Group Channel</th>
+                    <td>{}</td>
+                </tr>
+                <tr>
+                    <th>Standard Channels</th>
+                    <td>{}</td>
+                </tr>
+                <tr>
+                    <th>Extended Channels</th>
+                    <td>{}</td>
+                </tr>
+            </table>
+            "#,
+                client.client_id,
+                client.connection_flags,
+                client.group_channel.is_some().then(|| "Yes").unwrap_or("No"),
+                client.standard_channels.read().await.len(),
+                client.extended_channels.read().await.len()
+            ));
+        }
+    } else {
+        rows.push_str(
+            r#"<div><h2>Nothing here yet</h2></div>"#,
+        );
+    }
+
+    Html(rows)
+}
+
 pub fn api_routes(shared_state: SharedStateHandle) -> Router {
     Router::new()
         .route("/api/config", axum::routing::get(serve_config_htmx))
@@ -188,5 +277,7 @@ pub fn api_routes(shared_state: SharedStateHandle) -> Router {
             "/api/latest-prev-hash",
             axum::routing::get(get_latest_prev_hash),
         )
+        .route("/api/mining-stats", axum::routing::get(get_mining_stats))
+        .route("/api/clients", axum::routing::get(get_clients_stats))
         .with_state(shared_state)
 }

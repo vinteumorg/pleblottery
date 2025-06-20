@@ -20,7 +20,7 @@ pub struct PlebLotteryService {
 }
 
 impl PlebLotteryService {
-    pub fn new(
+    pub async fn new(
         mining_server_config: PlebLotteryMiningServerConfig,
         template_distribution_client_config: PlebLotteryTemplateDistributionClientConfig,
         shared_state: SharedStateHandle,
@@ -34,7 +34,7 @@ impl PlebLotteryService {
             mining_server_config.coinbase_tag,
             mining_server_config.share_batch_size,
             mining_server_config.expected_shares_per_minute,
-        );
+        ).await;
         let template_distribution_client_handler =
             PlebLotteryTemplateDistributionClientHandler::new(
                 client_config

@@ -24,7 +24,7 @@ async fn main() -> anyhow::Result<()> {
         config.mining_server_config,
         config.template_distribution_config,
         shared_state.clone(),
-    )?;
+    ).await?;
 
     pleblottery_service.start().await?;
 
