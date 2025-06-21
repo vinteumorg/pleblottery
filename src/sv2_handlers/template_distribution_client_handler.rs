@@ -52,8 +52,6 @@ impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionCli
         )))
     }
 
-    async fn shutdown(&mut self) {}
-
     async fn handle_new_template(
         &self,
         template: NewTemplate<'static>,

@@ -28,9 +28,15 @@ async fn test_template_provider_connection() {
         config.template_distribution_config.clone(),
         shared_state,
     )
+    .await
     .unwrap();
 
-    pleblottery_service.start().await.unwrap();
+    let mut pleblottery_service_clone = pleblottery_service.clone();
+    tokio::spawn(async move {
+        pleblottery_service_clone.start().await.unwrap();
+    });
+    // wait for the service to start
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     sniffer
         .wait_for_message_type(

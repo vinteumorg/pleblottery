@@ -252,15 +252,17 @@ pub async fn get_clients_stats(State(shared_state): State<SharedStateHandle>) ->
             "#,
                 client.client_id,
                 client.connection_flags,
-                client.group_channel.is_some().then(|| "Yes").unwrap_or("No"),
+                client
+                    .group_channel
+                    .is_some()
+                    .then(|| "Yes")
+                    .unwrap_or("No"),
                 client.standard_channels.read().await.len(),
                 client.extended_channels.read().await.len()
             ));
         }
     } else {
-        rows.push_str(
-            r#"<div><h2>Nothing here yet</h2></div>"#,
-        );
+        rows.push_str(r#"<div><h2>Nothing here yet</h2></div>"#);
     }
 
     Html(rows)

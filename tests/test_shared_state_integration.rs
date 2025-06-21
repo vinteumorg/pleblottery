@@ -40,17 +40,24 @@ async fn test_shared_state_between_service_and_web() {
         config.template_distribution_config.clone(),
         shared_state.clone(),
     )
+    .await
     .expect("Failed to create PlebLotteryService");
 
-    pleblottery_service
-        .start()
-        .await
-        .expect("Failed to start service");
+    let mut pleblottery_service_clone = pleblottery_service.clone();
+    tokio::spawn(async move {
+        pleblottery_service_clone.start().await.unwrap();
+    });
+
+    // wait for the service to start
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     // Start the web server with the same shared state
-    start_web_server(&config.web_config, shared_state.clone())
-        .await
-        .unwrap();
+    let web_config = config.web_config.clone();
+    tokio::spawn(async move {
+        start_web_server(&web_config, shared_state.clone())
+            .await
+            .unwrap();
+    });
 
     // Wait until a `NewTemplate` message is seen going downstream (from TP to service)
     tp_sniffer

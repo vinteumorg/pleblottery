@@ -34,9 +34,15 @@ async fn test_submit_share_and_submit_solution() {
         config.template_distribution_config.clone(),
         shared_state,
     )
+    .await
     .unwrap();
 
-    pleblottery_service.start().await.unwrap();
+    let mut pleblottery_service_clone = pleblottery_service.clone();
+    tokio::spawn(async move {
+        pleblottery_service_clone.start().await.unwrap();
+    });
+    // wait for the service to start
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
     let pleblottery_address = format!("0.0.0.0:{}", config.mining_server_config.listening_port);
 

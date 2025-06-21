@@ -14,6 +14,7 @@ path = "src/lib.rs"
 [dependencies]
 tower-stratum = { git = "https://github.com/plebhash/tower-stratum.git", branch = "sri-main" }
 tokio = { version = "1.44.1", features = ["full", "tracing"] }
+tokio-util = "0.7.15"
 anyhow = "1.0"
 clap = { version = "4.4", features = ["derive"] }
 toml = "0.8"

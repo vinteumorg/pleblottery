@@ -29,6 +29,7 @@ async fn test_without_template_provider() {
         config.template_distribution_config.clone(),
         shared_state,
     )
+    .await
     .expect("Failed to create PlebLotteryService");
 
     let result = pleblottery_service.start().await;
