@@ -13,7 +13,7 @@ use tower_stratum::roles_logic_sv2::{
 };
 
 mod common;
-use common::load_config;
+use common::{load_config, load_miner_config};
 
 #[tokio::test]
 async fn test_connection_with_sv2_minig_device() {
@@ -50,7 +50,17 @@ async fn test_connection_with_sv2_minig_device() {
         vec![],
     );
 
-    start_mining_device_sv2(sniffer_address, None, None, None, 1, None, true);
+    let mut miner_config = load_miner_config();
+    miner_config.server_addr = sniffer_address;
+    miner_config.n_extended_channels = 0;
+    tokio::spawn(async move {
+        sv2_cpu_miner::client::Sv2CpuMiner::new(miner_config)
+            .await
+            .unwrap()
+            .start()
+            .await
+            .unwrap();
+    });
 
     sniffer
         .wait_for_message_type(
@@ -155,7 +165,17 @@ async fn test_connection_with_sv2_minig_device_when_tp_not_send_new_template() {
         )
         .await;
 
-    start_mining_device_sv2(sniffer_address, None, None, None, 1, None, true);
+    let mut miner_config = load_miner_config();
+    miner_config.server_addr = sniffer_address;
+    miner_config.n_extended_channels = 0;
+    tokio::spawn(async move {
+        sv2_cpu_miner::client::Sv2CpuMiner::new(miner_config)
+            .await
+            .unwrap()
+            .start()
+            .await
+            .unwrap();
+    });
 
     sniffer
         .wait_for_message_type(
@@ -234,8 +254,18 @@ async fn test_connection_with_sv2_minig_device_when_tp_not_send_new_prev_hash() 
             MESSAGE_TYPE_NEW_TEMPLATE,
         )
         .await;
-
-    start_mining_device_sv2(sniffer_address, None, None, None, 1, None, true);
+    
+    let mut miner_config = load_miner_config();
+    miner_config.server_addr = sniffer_address;
+    miner_config.n_extended_channels = 0;
+    tokio::spawn(async move {
+        sv2_cpu_miner::client::Sv2CpuMiner::new(miner_config)
+            .await
+            .unwrap()
+            .start()
+            .await
+            .unwrap();
+    });
 
     sniffer
         .wait_for_message_type(

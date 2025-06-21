@@ -31,3 +31,4 @@ integration_tests_sv2 = { git = "https://github.com/stratum-mining/stratum", bra
 binary_codec_sv2 = { git = "https://github.com/stratum-mining/stratum", branch = "main" }
 once_cell = "1.21.3"
 reqwest = "0.12.15"
+sv2-cpu-miner = { git = "https://github.com/plebhash/sv2-cpu-miner.git", branch = "main" }
