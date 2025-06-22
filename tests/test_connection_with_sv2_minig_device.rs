@@ -5,8 +5,10 @@ use pleblottery::{service::PlebLotteryService, state::SharedStateHandle};
 use tower_stratum::roles_logic_sv2::{
     common_messages_sv2::{MESSAGE_TYPE_SETUP_CONNECTION, MESSAGE_TYPE_SETUP_CONNECTION_SUCCESS},
     mining_sv2::{
-        MESSAGE_TYPE_MINING_SET_NEW_PREV_HASH, MESSAGE_TYPE_NEW_MINING_JOB,
-        MESSAGE_TYPE_OPEN_MINING_CHANNEL_ERROR, MESSAGE_TYPE_OPEN_STANDARD_MINING_CHANNEL,
+        MESSAGE_TYPE_MINING_SET_NEW_PREV_HASH, MESSAGE_TYPE_NEW_EXTENDED_MINING_JOB,
+        MESSAGE_TYPE_NEW_MINING_JOB, MESSAGE_TYPE_OPEN_EXTENDED_MINING_CHANNEL,
+        MESSAGE_TYPE_OPEN_EXTENDED_MINING_CHANNEL_SUCCESS, MESSAGE_TYPE_OPEN_MINING_CHANNEL_ERROR,
+        MESSAGE_TYPE_OPEN_STANDARD_MINING_CHANNEL,
         MESSAGE_TYPE_OPEN_STANDARD_MINING_CHANNEL_SUCCESS,
     },
     template_distribution_sv2::{MESSAGE_TYPE_NEW_TEMPLATE, MESSAGE_TYPE_SET_NEW_PREV_HASH},
@@ -93,6 +95,97 @@ async fn test_connection_with_sv2_minig_device() {
         .wait_for_message_type(
             interceptor::MessageDirection::ToDownstream,
             MESSAGE_TYPE_NEW_MINING_JOB,
+        )
+        .await;
+
+    sniffer
+        .wait_for_message_type(
+            interceptor::MessageDirection::ToDownstream,
+            MESSAGE_TYPE_MINING_SET_NEW_PREV_HASH,
+        )
+        .await;
+
+    pleblottery_service.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn test_connection_with_sv2_minig_device_with_extended_channel() {
+    start_tracing();
+    let (_tp, tp_address) = start_template_provider(None);
+
+    let mut config = load_config();
+    config.template_distribution_config.server_addr = tp_address;
+
+    let shared_state: SharedStateHandle = SharedStateHandle::default();
+
+    let mut pleblottery_service = PlebLotteryService::new(
+        config.mining_server_config.clone(),
+        config.template_distribution_config.clone(),
+        shared_state,
+    )
+    .await
+    .expect("Failed to create PlebLotteryService");
+
+    let mut pleblottery_service_clone = pleblottery_service.clone();
+    tokio::spawn(async move {
+        pleblottery_service_clone.start().await.unwrap();
+    });
+
+    // wait for the service to start
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    let pleblottery_address = format!("0.0.0.0:{}", config.mining_server_config.listening_port);
+
+    let (sniffer, sniffer_address) = start_sniffer(
+        "sv2_device pleblottery",
+        pleblottery_address.parse().unwrap(),
+        false,
+        vec![],
+    );
+
+    let mut miner_config = load_miner_config();
+    miner_config.server_addr = sniffer_address;
+    miner_config.n_standard_channels = 0;
+    tokio::spawn(async move {
+        sv2_cpu_miner::client::Sv2CpuMiner::new(miner_config)
+            .await
+            .unwrap()
+            .start()
+            .await
+            .unwrap();
+    });
+
+    sniffer
+        .wait_for_message_type(
+            interceptor::MessageDirection::ToUpstream,
+            MESSAGE_TYPE_SETUP_CONNECTION,
+        )
+        .await;
+    sniffer
+        .wait_for_message_type(
+            interceptor::MessageDirection::ToDownstream,
+            MESSAGE_TYPE_SETUP_CONNECTION_SUCCESS,
+        )
+        .await;
+
+    sniffer
+        .wait_for_message_type(
+            interceptor::MessageDirection::ToUpstream,
+            MESSAGE_TYPE_OPEN_EXTENDED_MINING_CHANNEL,
+        )
+        .await;
+
+    sniffer
+        .wait_for_message_type(
+            interceptor::MessageDirection::ToDownstream,
+            MESSAGE_TYPE_OPEN_EXTENDED_MINING_CHANNEL_SUCCESS,
+        )
+        .await;
+
+    sniffer
+        .wait_for_message_type(
+            interceptor::MessageDirection::ToDownstream,
+            MESSAGE_TYPE_NEW_EXTENDED_MINING_JOB,
         )
         .await;
 
@@ -254,7 +347,7 @@ async fn test_connection_with_sv2_minig_device_when_tp_not_send_new_prev_hash() 
             MESSAGE_TYPE_NEW_TEMPLATE,
         )
         .await;
-    
+
     let mut miner_config = load_miner_config();
     miner_config.server_addr = sniffer_address;
     miner_config.n_extended_channels = 0;
