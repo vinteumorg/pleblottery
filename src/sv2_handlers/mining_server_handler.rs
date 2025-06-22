@@ -1,6 +1,7 @@
 use tokio::sync::{Mutex, RwLock};
 use tower_stratum::client::service::request::RequestToSv2Client;
 use tower_stratum::client::service::subprotocols::template_distribution::trigger::TemplateDistributionClientTrigger;
+use tower_stratum::roles_logic_sv2::channels::server::error::ExtendedChannelError;
 use tower_stratum::roles_logic_sv2::channels::server::error::StandardChannelError;
 use tower_stratum::roles_logic_sv2::channels::server::extended::ExtendedChannel;
 use tower_stratum::roles_logic_sv2::channels::server::group::GroupChannel;
@@ -8,6 +9,7 @@ use tower_stratum::roles_logic_sv2::channels::server::share_accounting::{
     ShareValidationError, ShareValidationResult,
 };
 use tower_stratum::roles_logic_sv2::channels::server::standard::StandardChannel;
+use tower_stratum::roles_logic_sv2::mining_sv2::OpenExtendedMiningChannelSuccess;
 use tower_stratum::roles_logic_sv2::mining_sv2::{
     CloseChannel, OpenExtendedMiningChannel, OpenMiningChannelError, OpenStandardMiningChannel,
     OpenStandardMiningChannelSuccess, SetCustomMiningJob, SubmitSharesError, SubmitSharesExtended,
@@ -54,6 +56,7 @@ pub struct PlebLotteryMiningServerHandler {
     pub last_activated_future_template: Arc<RwLock<Option<NewTemplate<'static>>>>,
     pub last_prev_hash: Arc<RwLock<Option<SetNewPrevHash<'static>>>>,
     pub extranonce_prefix_factory_standard: Arc<RwLock<ExtendedExtranonce>>,
+    pub extranonce_prefix_factory_extended: Arc<Mutex<ExtendedExtranonce>>,
     pub share_batch_size: usize,
     pub expected_shares_per_minute: f32,
 }
@@ -80,6 +83,7 @@ impl PlebLotteryMiningServerHandler {
         };
         let clients = Arc::new(RwLock::new(HashMap::new()));
         shared_state.write().await.clients = clients.clone();
+
         Self {
             clients,
             shared_state,
@@ -88,6 +92,15 @@ impl PlebLotteryMiningServerHandler {
             last_activated_future_template: Arc::new(RwLock::new(None)),
             last_prev_hash: Arc::new(RwLock::new(None)),
             extranonce_prefix_factory_standard: Arc::new(RwLock::new(
+                ExtendedExtranonce::new(
+                    range_0.clone(),
+                    range_1.clone(),
+                    range_2.clone(),
+                    Some(full_coinbase_tag.as_bytes().to_vec()),
+                )
+                .expect("valid ExtendedExtranonce must not fail"),
+            )),
+            extranonce_prefix_factory_extended: Arc::new(Mutex::new(
                 ExtendedExtranonce::new(
                     range_0,
                     range_1,
@@ -478,11 +491,232 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
 
     async fn handle_open_extended_mining_channel(
         &self,
-        _client_id: u32,
-        _m: OpenExtendedMiningChannel<'static>,
+        client_id: u32,
+        m: OpenExtendedMiningChannel<'static>,
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
         info!("Received OpenExtendedMiningChannel message");
-        Ok(ResponseFromSv2Server::Ok)
+
+        {
+            let m = m.clone();
+            self.shared_state.write().await.total_hashrate += m.nominal_hash_rate;
+        }
+
+        let mut messages = Vec::new();
+
+        let mut clients = self.clients.write().await;
+        let client = clients.get_mut(&client_id).ok_or_else(|| {
+            error!("Client with id {} not found", client_id);
+            RequestToSv2ServerError::IdNotFound
+        })?;
+
+        let channel_id = {
+            let client_guard = client.read().await;
+            let channel_id = client_guard.channel_id_factory.lock().await.next();
+            channel_id
+        };
+
+        let user_identity = std::str::from_utf8(m.user_identity.as_ref())
+            .unwrap()
+            .to_string();
+
+        let extranonce_prefix = {
+            self.extranonce_prefix_factory_extended
+                .lock()
+                .await
+                .next_prefix_standard()
+                .expect("Could not get extranonce prefix")
+                .to_vec()
+        };
+
+        let mut extended_channel = match ExtendedChannel::new(
+            channel_id,
+            user_identity,
+            extranonce_prefix,
+            m.max_target.to_owned().into(),
+            m.nominal_hash_rate,
+            true,
+            m.min_extranonce_size,
+            self.share_batch_size,
+            self.expected_shares_per_minute,
+        ) {
+            Ok(channel) => channel,
+            Err(e) => match e {
+                ExtendedChannelError::InvalidNominalHashrate => {
+                    error!("OpenMiningChannelError: invalid-nominal-hashrate");
+                    let error_message = OpenMiningChannelError {
+                        request_id: m.get_request_id_as_u32(),
+                        error_code: "invalid-nominal-hashrate".to_string().try_into().unwrap(),
+                    };
+                    return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                        RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                            client_id,
+                            messages: vec![AnyMessage::Mining(Mining::OpenMiningChannelError(
+                                error_message,
+                            ))],
+                        })),
+                    )));
+                }
+                ExtendedChannelError::RequestedMaxTargetOutOfRange => {
+                    error!("OpenMiningChannelError: max-target-out-of-range");
+                    let error_message = OpenMiningChannelError {
+                        request_id: m.get_request_id_as_u32(),
+                        error_code: "max-target-out-of-range".to_string().try_into().unwrap(),
+                    };
+                    return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                        RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                            client_id,
+                            messages: vec![AnyMessage::Mining(Mining::OpenMiningChannelError(
+                                error_message,
+                            ))],
+                        })),
+                    )));
+                }
+                ExtendedChannelError::RequestedMinExtranonceSizeTooLarge => {
+                    error!("OpenMiningChannelError: min-extranonce-size-too-large");
+                    let error_message = OpenMiningChannelError {
+                        request_id: m.get_request_id_as_u32(),
+                        error_code: "min-extranonce-size-too-large"
+                            .to_string()
+                            .try_into()
+                            .unwrap(),
+                    };
+                    return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                        RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                            client_id,
+                            messages: vec![AnyMessage::Mining(Mining::OpenMiningChannelError(
+                                error_message,
+                            ))],
+                        })),
+                    )));
+                }
+                _ => {
+                    error!("Error in handle_open_extended_mining_channel: {:?}", e);
+                    return Err(RequestToSv2ServerError::MiningHandlerError(format!(
+                        "Error creating extended channel: {:?}",
+                        e
+                    )));
+                }
+            },
+        };
+
+        // Get last activated future template
+        let last_activated_future_template_guard = self.last_activated_future_template.read().await;
+        let last_activated_future_template = (*last_activated_future_template_guard).clone();
+        let last_activated_future_template = match last_activated_future_template {
+            Some(template) => template,
+            None => {
+                error!("Unable to open standard mining channel with client {}: No last activated future template available", client_id);
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id: client_id,
+                        messages: vec![AnyMessage::Mining(Mining::OpenMiningChannelError(
+                            OpenMiningChannelError {
+                                request_id: m.get_request_id_as_u32(),
+                                error_code: "not-ready-to-open-channel" //note: non-standard error code
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+        };
+        let coinbase_tx_value_remaining =
+            last_activated_future_template.coinbase_tx_value_remaining;
+        let coinbase_output = TxOut {
+            value: Amount::from_sat(coinbase_tx_value_remaining),
+            script_pubkey: self.coinbase_output_script.clone(),
+        };
+
+        extended_channel
+            .on_new_template(
+                last_activated_future_template.clone(),
+                vec![coinbase_output],
+            )
+            .expect("Error processing new template on extended channel");
+
+        // get job message
+        let future_job_id = *extended_channel
+            .get_future_template_to_job_id()
+            .get(&last_activated_future_template.template_id)
+            .expect("future job must be present");
+        let future_job = extended_channel
+            .get_future_jobs()
+            .get(&future_job_id)
+            .expect("future job must be present")
+            .get_job_message()
+            .clone();
+
+        // Prepare last_prev_hash before mutably borrowing extended_channel
+        let last_prev_hash = self.last_prev_hash.read().await.clone();
+        let last_prev_hash = match last_prev_hash {
+            Some(prev_hash) => prev_hash,
+            None => {
+                error!("Unable to open standard mining channel with client {}: No last activated prev hash available", client_id);
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id: client_id,
+                        messages: vec![AnyMessage::Mining(Mining::OpenMiningChannelError(
+                            OpenMiningChannelError {
+                                request_id: m.get_request_id_as_u32(),
+                                error_code: "not-ready-to-open-channel" //note: non-standard error code
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+        };
+
+        // Now mutably borrow extended_channel
+        extended_channel
+            .on_set_new_prev_hash(last_prev_hash.clone())
+            .expect("Error processing SetNewPrevHash on extended channel");
+
+        let oxmcs = OpenExtendedMiningChannelSuccess {
+            request_id: m.request_id.clone(),
+            channel_id,
+            target: extended_channel.get_target().clone().into(),
+            extranonce_size: extended_channel.get_rollable_extranonce_size(),
+            extranonce_prefix: extended_channel
+                .get_extranonce_prefix()
+                .clone()
+                .try_into()
+                .expect("could not parse extranonce prefix"),
+        };
+
+        messages.push(AnyMessage::Mining(
+            Mining::OpenExtendedMiningChannelSuccess(oxmcs),
+        ));
+        messages.push(AnyMessage::Mining(Mining::NewExtendedMiningJob(future_job)));
+
+        //get set new prev hash message
+        let snphmp = SetNewPrevHashMp {
+            channel_id,
+            job_id: future_job_id,
+            prev_hash: last_prev_hash.prev_hash,
+            min_ntime: last_prev_hash.header_timestamp,
+            nbits: last_prev_hash.n_bits,
+        };
+        messages.push(AnyMessage::Mining(Mining::SetNewPrevHash(snphmp)));
+
+        // Register the new extended channel
+        let client_guard = client.read().await;
+        let ext_channels_arc = &client_guard.extended_channels;
+        ext_channels_arc
+            .write()
+            .await
+            .insert(channel_id, Arc::new(RwLock::new(extended_channel)));
+
+        Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+            RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                client_id,
+                messages,
+            })),
+        )))
     }
 
     async fn handle_update_channel(
@@ -735,11 +969,232 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
 
     async fn handle_submit_shares_extended(
         &self,
-        _client_id: u32,
-        _m: SubmitSharesExtended<'static>,
+        client_id: u32,
+        m: SubmitSharesExtended<'static>,
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
         info!("Received SubmitSharesExtended message");
-        Ok(ResponseFromSv2Server::Ok)
+        let clients_guard = self.clients.read().await;
+        let client = match clients_guard.get(&client_id) {
+            Some(client) => client,
+            None => {
+                error!("Client with id {} not found", client_id);
+                return Err(RequestToSv2ServerError::IdNotFound);
+            }
+        };
+
+        let client_guard = client.read().await;
+        let extended_channels_arc = &client_guard.extended_channels;
+        let ext_channels_guard = extended_channels_arc.read().await;
+        let extended_channel_arc = match ext_channels_guard.get(&m.channel_id) {
+            Some(channel) => channel,
+            None => {
+                error!("SubmitSharesError: channel_id: {}, sequence_number: {}, error_code: invalid-channel-id ❌", m.channel_id, m.sequence_number);
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id,
+                        messages: vec![AnyMessage::Mining(Mining::SubmitSharesError(
+                            SubmitSharesError {
+                                channel_id: m.channel_id,
+                                sequence_number: m.sequence_number,
+                                error_code: "invalid-channel-id"
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+        };
+
+        let mut extended_channel = extended_channel_arc.write().await;
+        let share_validation_result = extended_channel.validate_share(m.clone());
+
+        match share_validation_result {
+            Ok(ShareValidationResult::Valid) => {
+                info!(
+                    "SubmitSharesExtended: valid share | channel_id: {}, sequence_number: {} ☑️",
+                    m.channel_id, m.sequence_number
+                );
+                {
+                    let mut state = self.shared_state.write().await;
+                    state.total_shares_submitted += 1;
+                }
+                return Ok(ResponseFromSv2Server::Ok);
+            }
+            Ok(ShareValidationResult::ValidWithAcknowledgement(
+                last_sequence_number,
+                new_submits_accepted_count,
+                new_shares_sum,
+            )) => {
+                let success = SubmitSharesSuccess {
+                    channel_id: m.channel_id,
+                    last_sequence_number,
+                    new_submits_accepted_count,
+                    new_shares_sum,
+                };
+                info!("SubmitSharesExtended: {:?} ✅", success);
+
+                {
+                    let share_accounting = extended_channel.get_share_accounting();
+                    let mut state = self.shared_state.write().await;
+                    let best_share = share_accounting.get_best_diff();
+                    state.best_share = if best_share > state.best_share {
+                        best_share
+                    } else {
+                        state.best_share
+                    };
+                    state.total_shares_submitted += 1;
+                }
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id,
+                        messages: vec![AnyMessage::Mining(Mining::SubmitSharesSuccess(success))],
+                    })),
+                )));
+            }
+            Ok(ShareValidationResult::BlockFound(template_id, coinbase)) => {
+                info!("SubmitSharesExtended: 💰 Block Found!!! 💰");
+                let template_id = template_id
+                    .expect("Pleblottery does not support custom jobs. Something weird happened.");
+
+                info!("SubmitSharesExtended: Propagating solution to the Template Provider.");
+
+                let share_accounting = extended_channel.get_share_accounting();
+
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::MultipleRequests(Box::new(vec![
+                        RequestToSv2Server::SendRequestToSiblingClientService(Box::new(
+                            RequestToSv2Client::TemplateDistributionTrigger(
+                                TemplateDistributionClientTrigger::SubmitSolution(SubmitSolution {
+                                    template_id,
+                                    version: m.version,
+                                    header_timestamp: m.ntime,
+                                    header_nonce: m.nonce,
+                                    coinbase_tx: coinbase
+                                        .try_into()
+                                        .expect("coinbase tx must be valid"),
+                                }),
+                            ),
+                        )),
+                        RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                            client_id,
+                            messages: vec![AnyMessage::Mining(Mining::SubmitSharesSuccess(
+                                SubmitSharesSuccess {
+                                    channel_id: m.channel_id,
+                                    last_sequence_number: share_accounting
+                                        .get_last_share_sequence_number(),
+                                    new_submits_accepted_count: share_accounting
+                                        .get_shares_accepted(),
+                                    new_shares_sum: share_accounting.get_share_work_sum(),
+                                },
+                            ))],
+                        })),
+                    ])),
+                )));
+            }
+            Err(ShareValidationError::Invalid) => {
+                error!("SubmitSharesError: channel_id: {}, sequence_number: {}, error_code: invalid-share ❌", m.channel_id, m.sequence_number);
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id,
+                        messages: vec![AnyMessage::Mining(Mining::SubmitSharesError(
+                            SubmitSharesError {
+                                channel_id: m.channel_id,
+                                sequence_number: m.sequence_number,
+                                error_code: "invalid-share"
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+            Err(ShareValidationError::Stale) => {
+                error!("SubmitSharesError: channel_id: {}, sequence_number: {}, error_code: stale-share ❌", m.channel_id, m.sequence_number);
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id,
+                        messages: vec![AnyMessage::Mining(Mining::SubmitSharesError(
+                            SubmitSharesError {
+                                channel_id: m.channel_id,
+                                sequence_number: m.sequence_number,
+                                error_code: "stale-share"
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+            Err(ShareValidationError::InvalidJobId) => {
+                error!("SubmitSharesError: channel_id: {}, sequence_number: {}, error_code: invalid-job-id ❌", m.channel_id, m.sequence_number);
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id,
+                        messages: vec![AnyMessage::Mining(Mining::SubmitSharesError(
+                            SubmitSharesError {
+                                channel_id: m.channel_id,
+                                sequence_number: m.sequence_number,
+                                error_code: "invalid-job-id"
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+            Err(ShareValidationError::DoesNotMeetTarget) => {
+                error!("SubmitSharesError: channel_id: {}, sequence_number: {}, error_code: difficulty-too-low ❌", m.channel_id, m.sequence_number);
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id,
+                        messages: vec![AnyMessage::Mining(Mining::SubmitSharesError(
+                            SubmitSharesError {
+                                channel_id: m.channel_id,
+                                sequence_number: m.sequence_number,
+                                error_code: "difficulty-too-low"
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+            Err(ShareValidationError::DuplicateShare) => {
+                error!("SubmitSharesError: channel_id: {}, sequence_number: {}, error_code: duplicate-share ❌", m.channel_id, m.sequence_number);
+
+                return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                    RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                        client_id,
+                        messages: vec![AnyMessage::Mining(Mining::SubmitSharesError(
+                            SubmitSharesError {
+                                channel_id: m.channel_id,
+                                sequence_number: m.sequence_number,
+                                error_code: "duplicate-share"
+                                    .to_string()
+                                    .try_into()
+                                    .expect("error code must be valid string"),
+                            },
+                        ))],
+                    })),
+                )));
+            }
+            _ => {
+                error!(
+                    "Unhandled share validation result for client: {}",
+                    client_id
+                );
+                return Err(RequestToSv2ServerError::MiningHandlerError(format!(
+                    "Unhandled share validation result for client: {}",
+                    client_id
+                )));
+            }
+        }
     }
 
     async fn handle_set_custom_mining_job(
@@ -863,7 +1318,51 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                         messages_to_client.push(future_standard_job);
                     }
 
-                    // todo: process extended channels
+                    //process extended channels
+                    let extended_channels_arc = &client.extended_channels;
+                    for (_, extended_channel_guard) in extended_channels_arc.read().await.iter() {
+                        let mut extended_channel = extended_channel_guard.write().await;
+                        extended_channel
+                            .on_new_template(template.clone(), vec![coinbase_tx_output.clone()])
+                            .map_err(|e| {
+                                error!(
+                                    "Error sending new future template to extended  channel: {:?}",
+                                    e
+                                );
+                                RequestToSv2ServerError::MiningHandlerError(format!(
+                                    "Error sending new future template to extended channel: {:?}",
+                                    e
+                                ))
+                            })?;
+
+                        let future_job_id = extended_channel
+                            .get_future_template_to_job_id()
+                            .get(&template.template_id)
+                            .ok_or_else(|| {
+                                error!("Error getting future job id");
+                                RequestToSv2ServerError::MiningHandlerError(format!(
+                                    "Error getting future job id for template {:?} for extended channel {:?}",
+                                    template.template_id,
+                                    extended_channel.get_channel_id()
+                                ))
+                            })?;
+
+                        let future_job = extended_channel.get_future_jobs().get(future_job_id).ok_or_else(|| {
+                            error!("Error getting future job");
+                            RequestToSv2ServerError::MiningHandlerError(format!(
+                                "Error getting future job for template {:?} for extended channel {:?}",
+                                template.template_id,
+                                extended_channel.get_channel_id()
+                            ))
+                        })?;
+
+                        let future_standard_job = AnyMessage::Mining(Mining::NewExtendedMiningJob(
+                            future_job.get_job_message().clone(),
+                        ));
+
+                        info!("Sending future NewExtendedMiningJob message to channel {} of client {:?} for job id {:?}", extended_channel.get_channel_id(), client_id, future_job_id);
+                        messages_to_client.push(future_standard_job);
+                    }
 
                     let message_to_client = Sv2MessagesToClient {
                         client_id: *client_id,
@@ -927,7 +1426,32 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                         info!("Sending non-future NewMiningJob message to channel {} of client {:?} for job id {:?}", standard_channel.get_channel_id(), client_id, active_job.get_job_id());
                         messages_to_client.push(standard_job);
                     }
-                    // todo: process extended channels
+                    //process extended channels
+                    let extended_channels_arc = &client.extended_channels;
+                    for (_, extended_channel_guard) in extended_channels_arc.read().await.iter() {
+                        let mut extended_channel = extended_channel_guard.write().await;
+                        extended_channel
+                            .on_new_template(template.clone(), vec![coinbase_tx_output.clone()])
+                            .map_err(|e| {
+                                error!("Error sending new template to extended channel: {:?}", e);
+                                RequestToSv2ServerError::MiningHandlerError(format!(
+                                    "Error sending new template to extended channel: {:?}",
+                                    e
+                                ))
+                            })?;
+                        let active_job = extended_channel.get_active_job().ok_or_else(|| {
+                            error!("Error getting active job");
+                            RequestToSv2ServerError::MiningHandlerError(format!(
+                                "Error getting active job for extended channel {:?}",
+                                extended_channel.get_channel_id()
+                            ))
+                        })?;
+                        let standard_job = AnyMessage::Mining(Mining::NewExtendedMiningJob(
+                            active_job.get_job_message().clone(),
+                        ));
+                        info!("Sending non-future NewExtendedMiningJob message to channel {} of client {:?} for job id {:?}", extended_channel.get_channel_id(), client_id, active_job.get_job_id());
+                        messages_to_client.push(standard_job);
+                    }
 
                     let message_to_client = Sv2MessagesToClient {
                         client_id: *client_id,
@@ -1080,7 +1604,54 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                 messages_to_client.push(set_new_prev_hash_mp);
             }
 
-            // todo: process extended channels
+            //process extended channels
+            let extended_channels_arc = &client_guard.extended_channels;
+            for (_, extended_channel_guard) in extended_channels_arc.read().await.iter() {
+                let mut extended_channel = extended_channel_guard.write().await;
+
+                extended_channel
+                    .on_set_new_prev_hash(prev_hash.clone())
+                    .map_err(|e| {
+                        error!(
+                            "Error processing SetNewPrevHash on extended channel: {:?}",
+                            e
+                        );
+                        RequestToSv2ServerError::MiningHandlerError(format!(
+                            "Error processing SetNewPrevHash on extended channel: {:?}",
+                            e
+                        ))
+                    })?;
+
+                let extended_channel_active_job =
+                    extended_channel.get_active_job().ok_or_else(|| {
+                        error!("Error getting active job");
+                        RequestToSv2ServerError::MiningHandlerError(format!(
+                            "Error getting active job for extended channel {:?}",
+                            extended_channel.get_channel_id()
+                        ))
+                    })?;
+
+                let active_job_id = extended_channel_active_job.get_job_id();
+
+                let set_new_prev_hash_mp = SetNewPrevHashMp {
+                    channel_id: extended_channel.get_channel_id(),
+                    prev_hash: prev_hash.prev_hash.clone(),
+                    job_id: active_job_id,
+                    min_ntime: prev_hash.header_timestamp,
+                    nbits: prev_hash.n_bits,
+                };
+
+                let set_new_prev_hash_mp =
+                    AnyMessage::Mining(Mining::SetNewPrevHash(set_new_prev_hash_mp));
+
+                info!(
+                    "Sending SetNewPrevHash message to channel {} of client {:?} for job id {:?}",
+                    extended_channel.get_channel_id(),
+                    client_id,
+                    active_job_id
+                );
+                messages_to_client.push(set_new_prev_hash_mp);
+            }
 
             let messages_to_client = Sv2MessagesToClient {
                 client_id: *client_id,
