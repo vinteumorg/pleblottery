@@ -28,7 +28,7 @@ pub async fn serve_index() -> Html<&'static str> {
                 <br>
                 <b><span style="color: #3CAD65">$</span> pleblottery <span style="color: #D6AF46">#</span></b>
                 <br><br>
-                <img src="/static/images/pleblottery.png" alt="pleblottery logo">
+                <img src="/static/images/pleblottery.png" alt="pleblottery logo" width="600">
                 <br><br>
                 a Rust-based hashrate aggregator for a pleb-friendly and fully sovereign solo/lottery Bitcoin mining experience over <a href="https://stratumprotocol.org">Stratum V2</a>
                 <br><br>
@@ -41,7 +41,7 @@ pub async fn serve_index() -> Html<&'static str> {
             <a href="/config">Configuration</a>
             <br>
             <a href="https://github.com/vinteumorg/pleblottery">Source Code</a>
-            <br>
+            <br><br>
             <hr>
             <br>
             ⛏️ plebs be hashin ⚡
