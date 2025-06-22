@@ -186,6 +186,19 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
             overflow-x: auto;
         }
 
+        .table-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .table-container .responsive-table {
+            flex: 1;
+            max-width: 900px;
+            min-width: 600px;
+        }
+
         .tg tr {
             height: 50px;
         }
@@ -217,56 +230,57 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
         <a href="/">Home</a>
         <br>
         <hr>
-        <div id="block-height-container" class="responsive-table">
-            <table class="tg">
-                <thead>
-                    <tr>
-                        <th colspan="2">Chain Tip</th>
-                    </tr>
-                </thead>
-                <tbody hx-get="/api/latest-prev-hash" hx-trigger="every 2s" hx-target="this" hx-swap="innerHTML">
-                    <tr>
-                        <td>Height</td>
-                        <td>Loading...</td>
-                    </tr>
-                    <tr>
-                        <td>Prev Hash</td>
-                        <td>Loading...</td>
-                    </tr>
-                    <tr>
-                        <td>nBits</td>
-                        <td>Loading...</td>
-                    </tr>
-                    <tr>
-                        <td>Target</td>
-                        <td>Loading...</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        <br><br>
-        <div id="dashboard-container" class="responsive-table">
-            <table class="tg">
-                <thead>
-                    <tr>
-                        <th colspan="2">Lastest Template</th>
-                    </tr>
-                </thead>
-                <tbody hx-get="/api/latest-template" hx-trigger="every 2s" hx-target="this" hx-swap="innerHTML">
-                    <tr>
-                        <td>Template ID</td>
-                        <td>Loading...</td>
-                    </tr>
-                    <tr>
-                        <td>Version</td>
-                        <td>Loading...</td>
-                    </tr>
-                    <tr>
-                        <td>Coinbase Value</td>
-                        <td>Loading...</td>
-                    </tr>
-                </tbody>
-            </table>
+        <div class="table-container">
+            <div id="block-height-container" class="responsive-table">
+                <table class="tg">
+                    <thead>
+                        <tr>
+                            <th colspan="2">Chain Tip</th>
+                        </tr>
+                    </thead>
+                    <tbody hx-get="/api/latest-prev-hash" hx-trigger="every 2s" hx-target="this" hx-swap="innerHTML">
+                        <tr>
+                            <td>Height</td>
+                            <td>Loading...</td>
+                        </tr>
+                        <tr>
+                            <td>Prev Hash</td>
+                            <td>Loading...</td>
+                        </tr>
+                        <tr>
+                            <td>nBits</td>
+                            <td>Loading...</td>
+                        </tr>
+                        <tr>
+                            <td>Target</td>
+                            <td>Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="dashboard-container" class="responsive-table">
+                <table class="tg">
+                    <thead>
+                        <tr>
+                            <th colspan="2">Latest Template</th>
+                        </tr>
+                    </thead>
+                    <tbody hx-get="/api/latest-template" hx-trigger="every 2s" hx-target="this" hx-swap="innerHTML">
+                        <tr>
+                            <td>Template ID</td>
+                            <td>Loading...</td>
+                        </tr>
+                        <tr>
+                            <td>Version</td>
+                            <td>Loading...</td>
+                        </tr>
+                        <tr>
+                            <td>Coinbase Value</td>
+                            <td>Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
         <br><br>
         <div id="dashboard-container" class="responsive-table">
