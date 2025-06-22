@@ -193,7 +193,7 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
 
         .table-container .responsive-table {
             flex: 1;
-            max-width: 900px;
+            max-width: 600px;
             min-width: 600px;
         }
 
