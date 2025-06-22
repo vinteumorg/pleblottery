@@ -103,6 +103,11 @@ pub async fn serve_config_html() -> Html<&'static str> {
                         <!-- Rows will be dynamically loaded here -->
                     </tbody>
                 </table>
+                <br>
+                <b>Note:</b> this page simply displays the configuration parameters that were loaded from the config file.
+                <br>
+                To change the configuration, edit <code>config.toml</code> and restart the service.
+                <br>
             </div>
             <br>
             <hr>
