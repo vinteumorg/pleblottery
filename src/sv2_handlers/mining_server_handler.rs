@@ -12,6 +12,7 @@ use tower_stratum::roles_logic_sv2::channels::server::standard::StandardChannel;
 use tower_stratum::roles_logic_sv2::mining_sv2::NewExtendedMiningJob;
 use tower_stratum::roles_logic_sv2::mining_sv2::NewMiningJob;
 use tower_stratum::roles_logic_sv2::mining_sv2::OpenExtendedMiningChannelSuccess;
+use tower_stratum::roles_logic_sv2::mining_sv2::UpdateChannelError;
 use tower_stratum::roles_logic_sv2::mining_sv2::{
     CloseChannel, OpenExtendedMiningChannel, OpenMiningChannelError, OpenStandardMiningChannel,
     OpenStandardMiningChannelSuccess, SetCustomMiningJob, SubmitSharesError, SubmitSharesExtended,
@@ -765,11 +766,185 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
 
     async fn handle_update_channel(
         &self,
-        _client_id: u32,
-        _m: UpdateChannel<'static>,
+        client_id: u32,
+        m: UpdateChannel<'static>,
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
         info!("Received UpdateChannel message");
-        Ok(ResponseFromSv2Server::Ok)
+        let client = self.get_client(client_id).await;
+        let is_standard_channel = client
+            .read()
+            .await
+            .standard_channels
+            .read()
+            .await
+            .contains_key(&m.channel_id);
+
+        let is_extended_channel = client
+            .read()
+            .await
+            .extended_channels
+            .read()
+            .await
+            .contains_key(&m.channel_id);
+
+        if is_standard_channel {
+            let client_read_guard = client.read().await;
+            let std_channels_read_guard = client_read_guard.standard_channels.read().await;
+            let standard_channel = std_channels_read_guard
+                .get(&m.channel_id)
+                .expect("Standard channel must exist");
+
+            match standard_channel.write().await.update_channel(
+                m.nominal_hash_rate,
+                Some(m.maximum_target.into_static().into()),
+            ) {
+                Ok(()) => {
+                    info!("Updated standard channel | channel_id: {}", m.channel_id);
+                    return Ok(ResponseFromSv2Server::Ok);
+                }
+                Err(e) => match e {
+                    StandardChannelError::InvalidNominalHashrate => {
+                        error!("UpdateChannelError: invalid-nominal-hashrate");
+                        let update_channel_error = UpdateChannelError {
+                            channel_id: m.channel_id,
+                            error_code: "invalid-nominal-hashrate"
+                                .to_string()
+                                .try_into()
+                                .expect("error code must be valid string"),
+                        };
+                        return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                            RequestToSv2Server::SendMessagesToClient(Box::new(
+                                Sv2MessagesToClient {
+                                    client_id,
+                                    messages: vec![AnyMessage::Mining(Mining::UpdateChannelError(
+                                        update_channel_error,
+                                    ))],
+                                },
+                            )),
+                        )));
+                    }
+                    StandardChannelError::RequestedMaxTargetOutOfRange => {
+                        error!("UpdateChannelError: requested-max-target-out-of-range");
+                        let update_channel_error = UpdateChannelError {
+                            channel_id: m.channel_id,
+                            error_code: "requested-max-target-out-of-range"
+                                .to_string()
+                                .try_into()
+                                .expect("error code must be valid string"),
+                        };
+                        return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                            RequestToSv2Server::SendMessagesToClient(Box::new(
+                                Sv2MessagesToClient {
+                                    client_id,
+                                    messages: vec![AnyMessage::Mining(Mining::UpdateChannelError(
+                                        update_channel_error,
+                                    ))],
+                                },
+                            )),
+                        )));
+                    }
+                    _ => {
+                        return Err(RequestToSv2ServerError::MiningHandlerError(format!(
+                            "Error updating standard channel: {:?}",
+                            e
+                        )));
+                    }
+                },
+            };
+        } else if is_extended_channel {
+            // Scope the client_read_guard so it is dropped before the await
+            let extended_channel = {
+                let client_read_guard = client.read().await;
+                let ext_channels_read_guard = client_read_guard.extended_channels.read().await;
+                ext_channels_read_guard
+                    .get(&m.channel_id)
+                    .expect("Extended channel must exist")
+                    .clone()
+            };
+
+            let update_result = {
+                let mut channel = extended_channel.write().await;
+                channel.update_channel(
+                    m.nominal_hash_rate,
+                    Some(m.maximum_target.into_static().into()),
+                )
+            };
+
+            match update_result {
+                Ok(()) => {
+                    info!("Updated extended channel | channel_id: {}", m.channel_id);
+                    return Ok(ResponseFromSv2Server::Ok);
+                }
+                Err(e) => match e {
+                    ExtendedChannelError::InvalidNominalHashrate => {
+                        error!("UpdateChannelError: invalid-nominal-hashrate");
+                        let update_channel_error = UpdateChannelError {
+                            channel_id: m.channel_id,
+                            error_code: "invalid-nominal-hashrate"
+                                .to_string()
+                                .try_into()
+                                .expect("error code must be valid string"),
+                        };
+                        return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                            RequestToSv2Server::SendMessagesToClient(Box::new(
+                                Sv2MessagesToClient {
+                                    client_id,
+                                    messages: vec![AnyMessage::Mining(Mining::UpdateChannelError(
+                                        update_channel_error,
+                                    ))],
+                                },
+                            )),
+                        )));
+                    }
+                    ExtendedChannelError::RequestedMaxTargetOutOfRange => {
+                        error!("UpdateChannelError: requested-max-target-out-of-range");
+                        let update_channel_error = UpdateChannelError {
+                            channel_id: m.channel_id,
+                            error_code: "requested-max-target-out-of-range"
+                                .to_string()
+                                .try_into()
+                                .expect("error code must be valid string"),
+                        };
+                        return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                            RequestToSv2Server::SendMessagesToClient(Box::new(
+                                Sv2MessagesToClient {
+                                    client_id,
+                                    messages: vec![AnyMessage::Mining(Mining::UpdateChannelError(
+                                        update_channel_error,
+                                    ))],
+                                },
+                            )),
+                        )));
+                    }
+                    _ => {
+                        return Err(RequestToSv2ServerError::MiningHandlerError(format!(
+                            "Error updating extended channel: {:?}",
+                            e
+                        )));
+                    }
+                },
+            }
+        } else {
+            error!(
+                "UpdateChannelError: channel_id: {}, error_code: invalid-channel-id ❌",
+                m.channel_id
+            );
+            let update_channel_error = UpdateChannelError {
+                channel_id: m.channel_id,
+                error_code: "invalid-channel-id"
+                    .to_string()
+                    .try_into()
+                    .expect("error code must be valid string"),
+            };
+            return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
+                RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
+                    client_id,
+                    messages: vec![AnyMessage::Mining(Mining::UpdateChannelError(
+                        update_channel_error,
+                    ))],
+                })),
+            )));
+        }
     }
 
     async fn handle_close_channel(
@@ -1256,8 +1431,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         _client_id: u32,
         _m: SetCustomMiningJob<'static>,
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
-        info!("Received SetCustomMiningJob message");
-        Ok(ResponseFromSv2Server::Ok)
+        panic!("Pleblottery does not support custom mining jobs.");
     }
 
     async fn on_new_template(
