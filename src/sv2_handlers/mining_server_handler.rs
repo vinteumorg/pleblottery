@@ -830,6 +830,11 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
 
                 info!("SubmitSharesStandard: Propagating solution to the Template Provider.");
 
+                {
+                    let mut state = self.shared_state.write().await;
+                    state.blocks_found += 1;
+                }
+
                 let share_accounting = standard_channel.get_share_accounting();
 
                 return Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
@@ -1059,6 +1064,11 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                     .expect("Pleblottery does not support custom jobs. Something weird happened.");
 
                 info!("SubmitSharesExtended: Propagating solution to the Template Provider.");
+
+                {
+                    let mut state = self.shared_state.write().await;
+                    state.blocks_found += 1;
+                }
 
                 let share_accounting = extended_channel.get_share_accounting();
 

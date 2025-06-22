@@ -200,11 +200,16 @@ pub async fn get_mining_stats(State(shared_state): State<SharedStateHandle>) -> 
                     <td>Total Hashrate</td>
                     <td>{}</td>
                 </tr>
+                <tr>
+                    <td>💰 Blocks Found 💰</td>
+                    <td>{}</td>
+                </tr>
             "#,
             state.total_clients,
             state.total_shares_submitted,
             state.format_best_share(),
-            state.format_hashrate()
+            state.format_hashrate(),
+            state.blocks_found
         ));
     } else {
         rows.push_str(

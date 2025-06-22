@@ -328,6 +328,10 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
                         <td>Total Hashrate</td>
                         <td>Loading ...</td>
                     </tr>
+                    <tr>
+                        <td>💰 Blocks Found 💰</td>
+                        <td>Loading ...</td>
+                    </tr>
                 </tbody>
             </table>
         </div>

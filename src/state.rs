@@ -15,6 +15,7 @@ pub struct SharedState {
     pub total_shares_submitted: u64,
     pub best_share: f64,
     pub total_hashrate: f32,
+    pub blocks_found: u64,
     pub clients: Arc<RwLock<HashMap<u32, Arc<RwLock<PleblotteryMiningClient>>>>>,
 }
 impl SharedState {
