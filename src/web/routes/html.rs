@@ -291,12 +291,9 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
                             <td>Template ID</td>
                             <td>Loading...</td>
                         </tr>
+
                         <tr>
-                            <td>Version</td>
-                            <td>Loading...</td>
-                        </tr>
-                        <tr>
-                            <td>Coinbase Value</td>
+                            <td>Template Revenue (Sats)</td>
                             <td>Loading...</td>
                         </tr>
                     </tbody>

@@ -81,21 +81,11 @@ pub async fn get_latest_template(State(shared_state): State<SharedStateHandle>) 
                 <td>{}</td>
             </tr>
             <tr>
-                <td>Version</td>
-                <td>{}</td>
-            </tr>
-            <tr>
-                <td>Coinbase Value</td>
+                <td>Template Revenue (Sats)</td>
                 <td>{}</td>
             </tr>"#,
             template.template_id,
-            template
-                .version
-                .to_be_bytes()
-                .iter()
-                .map(|byte| format!("{:02x}", byte))
-                .collect::<String>(),
-            template.coinbase_tx_value_remaining as f64 / 100_000_000.0
+            template.coinbase_tx_value_remaining as f64
         );
         Html(rows)
     } else {
