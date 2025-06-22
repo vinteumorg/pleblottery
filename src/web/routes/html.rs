@@ -214,6 +214,12 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
             width: 100%;
         }
 
+        .mining-stats-container {
+            max-width: 400px;
+            min-width: 300px;
+            margin: 0 auto;
+        }
+
         .tg tr {
             height: 50px;
         }
@@ -298,7 +304,7 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
             </div>
         </div>
         <br><br>
-        <div id="dashboard-container" class="responsive-table">
+        <div id="dashboard-container" class="responsive-table mining-stats-container">
             <table class="tg">
                 <thead>
                     <tr>
