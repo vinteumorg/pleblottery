@@ -38,8 +38,6 @@ pub async fn serve_index() -> Html<&'static str> {
             <br>
             <a href="/dashboard">Dashboard</a>
             <br>
-            <a href="/clients">Clients</a>
-            <br>
             <a href="/config">Configuration</a>
             <br>
             <a href="https://github.com/vinteumorg/pleblottery">Source Code</a>
@@ -199,6 +197,23 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
             min-width: 600px;
         }
 
+        #clients-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        #clients-container > div {
+            flex: 0 1 auto;
+            min-width: 300px;
+            max-width: 400px;
+        }
+
+        #clients-container .tg {
+            width: 100%;
+        }
+
         .tg tr {
             height: 50px;
         }
@@ -309,6 +324,10 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
                     </tr>
                 </tbody>
             </table>
+        </div>
+        <br><br>
+        <div id="clients-container" hx-get="/api/clients" hx-trigger="every 2s" hx-target="this" hx-swap="innerHTML">
+            <!-- Client tables will be dynamically loaded here -->
         </div>
         <hr>
         ⛏️ plebs be hashin ⚡
@@ -436,5 +455,4 @@ pub fn html_routes() -> Router {
         .route("/", axum::routing::get(serve_index))
         .route("/config", axum::routing::get(serve_config_html))
         .route("/dashboard", axum::routing::get(serve_dashboard_html))
-        .route("/clients", axum::routing::get(serve_clients_html))
 }

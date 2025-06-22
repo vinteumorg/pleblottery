@@ -227,29 +227,39 @@ pub async fn get_clients_stats(State(shared_state): State<SharedStateHandle>) ->
             let client = client.read().await;
             rows.push_str(&format!(
                 r#"
-                <table class="tg">
-                    <tr>
-                        <th>Client ID</th>
-                        <td>{}</td>
-                    </tr>
-                    <tr>
-                        <th>Connection Flags</th>
-                        <td>{:04b}</td>
-                </tr>
-                <tr>
-                    <th>Group Channel</th>
-                    <td>{}</td>
-                </tr>
-                <tr>
-                    <th>Standard Channels</th>
-                    <td>{}</td>
-                </tr>
-                <tr>
-                    <th>Extended Channels</th>
-                    <td>{}</td>
-                </tr>
-            </table>
-            "#,
+                <div>
+                    <table class="tg">
+                        <thead>
+                            <tr>
+                                <th colspan="2">Client {}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Client ID</td>
+                                <td>{}</td>
+                            </tr>
+                            <tr>
+                                <td>Connection Flags</td>
+                                <td>{:04b}</td>
+                            </tr>
+                            <tr>
+                                <td>Group Channel</td>
+                                <td>{}</td>
+                            </tr>
+                            <tr>
+                                <td>Standard Channels</td>
+                                <td>{}</td>
+                            </tr>
+                            <tr>
+                                <td>Extended Channels</td>
+                                <td>{}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                "#,
+                client.client_id,
                 client.client_id,
                 client.connection_flags,
                 client
@@ -261,8 +271,6 @@ pub async fn get_clients_stats(State(shared_state): State<SharedStateHandle>) ->
                 client.extended_channels.read().await.len()
             ));
         }
-    } else {
-        rows.push_str(r#"<div><h2>Nothing here yet</h2></div>"#);
     }
 
     Html(rows)
