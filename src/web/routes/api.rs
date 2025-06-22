@@ -182,6 +182,12 @@ pub async fn get_mining_stats(State(shared_state): State<SharedStateHandle>) -> 
     let mut rows = String::new();
 
     if let Some(_) = &state.latest_prev_hash {
+        let hashrate_display = if state.total_clients == 0 {
+            "0.00 h/s".to_string()
+        } else {
+            state.format_hashrate()
+        };
+
         rows.push_str(&format!(
             r#"
                 <tr>
@@ -208,7 +214,7 @@ pub async fn get_mining_stats(State(shared_state): State<SharedStateHandle>) -> 
             state.total_clients,
             state.total_shares_submitted,
             state.format_best_share(),
-            state.format_hashrate(),
+            hashrate_display,
             state.blocks_found
         ));
     } else {

@@ -172,10 +172,19 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
             let clients_guard = self.clients.read().await;
             let client = clients_guard.get(&client_id).unwrap();
             let client_guard = client.read().await;
+
+            // Calculate hashrate from standard channels
             let std_channels = client_guard.standard_channels.read().await;
             for (_, channel) in std_channels.iter() {
                 hash += channel.read().await.get_nominal_hashrate();
             }
+
+            // Calculate hashrate from extended channels
+            let ext_channels = client_guard.extended_channels.read().await;
+            for (_, channel) in ext_channels.iter() {
+                hash += channel.read().await.get_nominal_hashrate();
+            }
+
             hash
         };
         self.clients.write().await.remove(&client_id);
@@ -185,6 +194,10 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
             let mut state = self.shared_state.write().await;
             state.total_clients = total_clients;
             state.total_hashrate -= hashrate;
+            // Ensure hashrate doesn't go negative due to floating point precision
+            if state.total_hashrate < 0.0 {
+                state.total_hashrate = 0.0;
+            }
         }
     }
 
@@ -496,11 +509,6 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
         info!("Received OpenExtendedMiningChannel message");
 
-        {
-            let m = m.clone();
-            self.shared_state.write().await.total_hashrate += m.nominal_hash_rate;
-        }
-
         let mut messages = Vec::new();
 
         let mut clients = self.clients.write().await;
@@ -703,6 +711,8 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         };
         messages.push(AnyMessage::Mining(Mining::SetNewPrevHash(snphmp)));
 
+        let nominal_hashrate = extended_channel.get_nominal_hashrate();
+
         // Register the new extended channel
         let client_guard = client.read().await;
         let ext_channels_arc = &client_guard.extended_channels;
@@ -710,6 +720,11 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
             .write()
             .await
             .insert(channel_id, Arc::new(RwLock::new(extended_channel)));
+
+        {
+            let mut state = self.shared_state.write().await;
+            state.total_hashrate += nominal_hashrate;
+        }
 
         Ok(ResponseFromSv2Server::TriggerNewRequest(Box::new(
             RequestToSv2Server::SendMessagesToClient(Box::new(Sv2MessagesToClient {
