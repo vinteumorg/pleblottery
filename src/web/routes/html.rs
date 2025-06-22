@@ -13,9 +13,9 @@ pub async fn serve_index() -> Html<&'static str> {
         <style type="text/css">
             .tg {border-collapse:collapse;border-spacing:0;}
             .tg td{border-color:white;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
-                overflow:hidden;padding:10px 5px;word-break:normal;}
+                overflow:hidden;padding:10px 5px;word-break:normal;text-align:center;}
             .tg th{border-color:white;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
-                font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;}
+                font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;text-align:center;}
             .tb {}
             .tb td{border-width: 0}
             body {background-color:#051426;color:white;}
@@ -68,9 +68,9 @@ pub async fn serve_config_html() -> Html<&'static str> {
         <style type="text/css">
             .tg {border-collapse:collapse;border-spacing:0;}
             .tg td{border-color:white;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
-                overflow:hidden;padding:10px 5px;word-break:normal;}
+                overflow:hidden;padding:10px 5px;word-break:normal;text-align:center;}
             .tg th{border-color:white;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
-                font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;}
+                font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;text-align:center;}
             .tb {}
             .tb td{border-width: 0}
             body {background-color:#051426;color:white;}
@@ -143,7 +143,7 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
             overflow: hidden;
             padding: 10px 5px;
             word-break: normal;
-            text-align: left;
+            text-align: center;
             width: 50%;
         }
 
@@ -328,7 +328,7 @@ pub async fn serve_clients_html() -> Html<&'static str> {
             overflow: hidden;
             padding: 10px 5px;
             word-break: normal;
-            text-align: left;
+            text-align: center;
             width: 50%;
         }
 
