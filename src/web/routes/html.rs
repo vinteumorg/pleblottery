@@ -296,7 +296,7 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
                         <td>Loading ...</td>
                     </tr>
                     <tr>
-                        <td>Total shares</td>
+                        <td>Total Shares</td>
                         <td>Loading ...</td>
                     </tr>
                     <tr>
