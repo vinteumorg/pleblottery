@@ -12,13 +12,13 @@ pub async fn serve_index() -> Html<&'static str> {
         <title>pleblottery</title>
         <style type="text/css">
             .tg {border-collapse:collapse;border-spacing:0;}
-            .tg td{border-color:white;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+            .tg td{border-color:white;border-style:solid;border-width:1px;font-family:Comic Sans MS, sans-serif;font-size:14px;
                 overflow:hidden;padding:10px 5px;word-break:normal;text-align:center;}
-            .tg th{border-color:white;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+            .tg th{border-color:white;border-style:solid;border-width:1px;font-family:Comic Sans MS, sans-serif;font-size:14px;
                 font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;text-align:center;}
             .tb {}
             .tb td{border-width: 0}
-            body {background-color:#051426;color:white;}
+            body {background-color:#051426;color:white;font-family:Comic Sans MS, sans-serif;}
             a {color:white}
         </style>
     </head>
@@ -26,16 +26,11 @@ pub async fn serve_index() -> Html<&'static str> {
         <center>
             <div style="background-color:#051426;color:white;"> 
                 <br>
-                <b><span style="color: #3CAD65">$</span> pleblottery <span style="color: #D6AF46">#</span></b>
-                <br><br>
                 <img src="/static/images/pleblottery.png" alt="pleblottery logo" width="600">
                 <br><br>
                 a Rust-based hashrate aggregator for a pleb-friendly and fully sovereign solo/lottery Bitcoin mining experience over <a href="https://stratumprotocol.org">Stratum V2</a>
                 <br><br>
             </div>
-            <br>
-            <a href="/">Home</a>
-            <br>
             <a href="/dashboard">Dashboard</a>
             <br>
             <a href="/config">Configuration</a>
@@ -65,13 +60,13 @@ pub async fn serve_config_html() -> Html<&'static str> {
         <title>pleblottery - Configuration</title>
         <style type="text/css">
             .tg {border-collapse:collapse;border-spacing:0;}
-            .tg td{border-color:white;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+            .tg td{border-color:white;border-style:solid;border-width:1px;font-family:Comic Sans MS, sans-serif;font-size:14px;
                 overflow:hidden;padding:10px 5px;word-break:normal;text-align:center;}
-            .tg th{border-color:white;border-style:solid;border-width:1px;font-family:Arial, sans-serif;font-size:14px;
+            .tg th{border-color:white;border-style:solid;border-width:1px;font-family:Comic Sans MS, sans-serif;font-size:14px;
                 font-weight:normal;overflow:hidden;padding:10px 5px;word-break:normal;text-align:center;}
             .tb {}
             .tb td{border-width: 0}
-            body {background-color:#051426;color:white;}
+            body {background-color:#051426;color:white;font-family:Comic Sans MS, sans-serif;}
             a {color:white}
         </style>
         <script src="https://unpkg.com/htmx.org"></script>
@@ -92,9 +87,9 @@ pub async fn serve_config_html() -> Html<&'static str> {
                 <table class="tg">
                     <thead>
                         <tr>
-                            <th>Configuration Parameter</th>
-                            <th>Value</th>
-                            <th>Description</th>
+                            <th><b>Configuration Parameter</b></th>
+                            <th><b>Value</b></th>
+                            <th><b>Description</b></th>
                         </tr>
                     </thead>
                     <tbody hx-get="/api/config" hx-trigger="load" hx-target="this">
@@ -102,9 +97,9 @@ pub async fn serve_config_html() -> Html<&'static str> {
                     </tbody>
                 </table>
                 <br>
-                <b>Note:</b> this page simply displays the configuration parameters that were loaded from the config file.
-                <br>
-                To change the configuration, edit <code>config.toml</code> and restart the service.
+                <b>Note:</b> this page simply displays the configuration parameters that were loaded from the configuration file.
+                <br><br>
+                To change the configuration, edit <code>config.toml</code> and restart <code>pleblottery</code>.
                 <br>
             </div>
             <br>
@@ -141,7 +136,7 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
             border-color: white;
             border-style: solid;
             border-width: 1px;
-            font-family: Arial, sans-serif;
+            font-family: Comic Sans MS, sans-serif;
             font-size: 14px;
             overflow: hidden;
             padding: 10px 5px;
@@ -168,11 +163,11 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
             color: white;
             margin: 0;
             padding: 0;
+            font-family: Comic Sans MS, sans-serif;
         }
 
         a {
             color: white;
-            text-decoration: none;
         }
 
         .container {
@@ -193,15 +188,15 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
 
         .table-container .responsive-table {
             flex: 1;
-            max-width: 600px;
-            min-width: 600px;
+            max-width: 650px;
+            min-width: 650px;
         }
 
         #clients-container {
             display: flex;
             flex-wrap: wrap;
             justify-content: center;
-            gap: 20px;
+            gap: 50px;
         }
 
         #clients-container > div {
@@ -249,8 +244,9 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
             <br>
         </div>
         <a href="/">Home</a>
-        <br>
+        <br><br>
         <hr>
+        <br>
         <div class="table-container">
             <div id="block-height-container" class="responsive-table">
                 <table class="tg">
@@ -336,118 +332,11 @@ pub async fn serve_dashboard_html() -> Html<&'static str> {
         <div id="clients-container" hx-get="/api/clients" hx-trigger="every 2s" hx-target="this" hx-swap="innerHTML">
             <!-- Client tables will be dynamically loaded here -->
         </div>
+        <br><br>
         <hr>
+        <br><br>
         ⛏️ plebs be hashin ⚡
-        <br>
-    </center>
-</body>
-
-</html>
-    "#,
-    )
-}
-
-pub async fn serve_clients_html() -> Html<&'static str> {
-    Html(
-        r#"
-        <!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>pleblottery - Clients</title>
-    <style type="text/css">
-        .tg {
-            border-collapse: collapse;
-            border-spacing: 0;
-        }
-
-        .tg td,
-        .tg th {
-            border-color: white;
-            border-style: solid;
-            border-width: 1px;
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-            overflow: hidden;
-            padding: 10px 5px;
-            word-break: normal;
-            text-align: center;
-            width: 50%;
-        }
-
-        /* Ensure equal width for all cells */
-        .tg th {
-            font-weight: bold;
-            text-align: center;
-            /* Center-align the table headers */
-        }
-
-        .tb td {
-            border-width: 0
-        }
-
-        body {
-            background-color: #051426;
-            color: white;
-            margin: 0;
-            padding: 0;
-        }
-
-        a {
-            color: white;
-            text-decoration: none;
-        }
-
-        .container {
-            display: flex;
-            flex-wrap: wrap;
-            padding: 20px;
-            overflow-x: auto;
-            justify-content: space-evenly;
-            align-items: center;
-        }
-
-        .tg tr {
-            height: 50px;
-        }
-
-        /* Ensure all rows have the same height */
-        @media (max-width: 768px) {
-
-            .tg td,
-            .tg th {
-                font-size: 12px;
-                padding: 8px;
-            }
-
-            .tg th {
-                font-weight: normal;
-            }
-        }
-    </style>
-    <script src="https://unpkg.com/htmx.org"></script>
-</head>
-
-<body>
-    <center>
-        <div class="container" style="background-color:#051426;color:white;">
-            <br>
-            <b><span style="color: #3CAD65">$</span> pleblottery <span style="color: #D6AF46">#</span></b>
-            <br>
-        </div>
-        <a href="/">Home</a>
-        <br>
-        <hr>
-        <div class="container" hx-get="/api/clients" hx-trigger="every 2s" hx-target="this" hx-swap="innerHTML">
-            <div>
-            <h2>Nothing here yet</h2>
-            </div>
-        </div>
-        <hr>
-        ⛏️ plebs be hashin ⚡
-        <br>
+        <br><br>
     </center>
 </body>
 
