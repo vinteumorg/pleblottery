@@ -117,10 +117,21 @@ impl PlebLotteryMiningServerHandler {
         }
     }
 
-    async fn get_client(&self, client_id: u32) -> Arc<RwLock<PleblotteryMiningClient>> {
+    async fn get_client(
+        &self,
+        client_id: u32,
+    ) -> Result<Arc<RwLock<PleblotteryMiningClient>>, RequestToSv2ServerError> {
         let clients = self.clients.read().await;
-        let client = clients.get(&client_id).expect("Client must exist");
-        client.clone()
+        let client = match clients.get(&client_id) {
+            Some(client) => client.clone(),
+            None => {
+                return Err(RequestToSv2ServerError::MiningHandlerError(format!(
+                    "Client with id {} not found",
+                    client_id
+                )));
+            }
+        };
+        Ok(client)
     }
 
     async fn get_last_activated_template(&self) -> Option<NewTemplate<'static>> {
@@ -135,59 +146,70 @@ impl PlebLotteryMiningServerHandler {
         last_prev_hash
     }
 
-    async fn get_coinbase_outputs(&self) -> Vec<TxOut> {
-        let future_template = self
-            .get_last_activated_template()
-            .await
-            .expect("There must be a last activated template");
+    async fn get_coinbase_outputs(&self) -> Result<Vec<TxOut>, RequestToSv2ServerError> {
+        let future_template = self.get_last_activated_template().await.ok_or(
+            RequestToSv2ServerError::MiningHandlerError(format!(
+                "No last activated template found"
+            )),
+        )?;
         let coinbase_txout = TxOut {
             value: Amount::from_sat(future_template.coinbase_tx_value_remaining),
             script_pubkey: self.coinbase_output_script.clone(),
         };
-        vec![coinbase_txout]
+        Ok(vec![coinbase_txout])
     }
 
     async fn get_future_job_message_extended(
         &self,
         extended_channel: &ExtendedChannel<'static>,
-    ) -> (u32, NewExtendedMiningJob<'static>) {
-        let template = self
-            .get_last_activated_template()
-            .await
-            .expect("there must be a last activated template");
+    ) -> Result<(u32, NewExtendedMiningJob<'static>), RequestToSv2ServerError> {
+        let template = self.get_last_activated_template().await.ok_or(
+            RequestToSv2ServerError::MiningHandlerError(format!(
+                "No last activated template found"
+            )),
+        )?;
         let future_job_id = *extended_channel
             .get_future_template_to_job_id()
             .get(&template.template_id)
-            .expect("future job must be present");
+            .ok_or(RequestToSv2ServerError::MiningHandlerError(format!(
+                "Future job must be present"
+            )))?;
         let future_job = extended_channel
             .get_future_jobs()
             .get(&future_job_id)
-            .expect("future job must be present")
+            .ok_or(RequestToSv2ServerError::MiningHandlerError(format!(
+                "Future job must be present"
+            )))?
             .get_job_message()
             .clone();
 
-        (future_job_id, future_job)
+        Ok((future_job_id, future_job))
     }
     async fn get_future_job_message(
         &self,
         extended_channel: &StandardChannel<'static>,
-    ) -> (u32, NewMiningJob<'static>) {
-        let template = self
-            .get_last_activated_template()
-            .await
-            .expect("there must be a last activated template");
+    ) -> Result<(u32, NewMiningJob<'static>), RequestToSv2ServerError> {
+        let template = self.get_last_activated_template().await.ok_or(
+            RequestToSv2ServerError::MiningHandlerError(format!(
+                "No last activated template found"
+            )),
+        )?;
         let future_job_id = *extended_channel
             .get_future_template_to_job_id()
             .get(&template.template_id)
-            .expect("future job must be present");
+            .ok_or(RequestToSv2ServerError::MiningHandlerError(format!(
+                "Future job must be present"
+            )))?;
         let future_job = extended_channel
             .get_future_jobs()
             .get(&future_job_id)
-            .expect("future job must be present")
+            .ok_or(RequestToSv2ServerError::MiningHandlerError(format!(
+                "Future job must be present"
+            )))?
             .get_job_message()
             .clone();
 
-        (future_job_id, future_job)
+        Ok((future_job_id, future_job))
     }
 
     async fn register_extended_channel(
@@ -195,14 +217,15 @@ impl PlebLotteryMiningServerHandler {
         client_id: u32,
         channel_id: u32,
         extended_channel: ExtendedChannel<'static>,
-    ) {
+    ) -> Result<(), RequestToSv2ServerError> {
         // Register the new extended channel
-        let client_guard = self.get_client(client_id).await;
+        let client_guard = self.get_client(client_id).await?;
         let ext_channels_arc = &client_guard.read().await.extended_channels;
         ext_channels_arc
             .write()
             .await
             .insert(channel_id, Arc::new(RwLock::new(extended_channel)));
+        Ok(())
     }
 
     async fn register_standard_channel(
@@ -210,9 +233,9 @@ impl PlebLotteryMiningServerHandler {
         client_id: u32,
         channel_id: u32,
         standard_channel: StandardChannel<'static>,
-    ) -> u32 {
+    ) -> Result<u32, RequestToSv2ServerError> {
         // Register the new standard channel
-        let client_guard = self.get_client(client_id).await;
+        let client_guard = self.get_client(client_id).await?;
         let std_channels_arc = &client_guard.read().await.standard_channels;
         std_channels_arc
             .write()
@@ -231,7 +254,7 @@ impl PlebLotteryMiningServerHandler {
         } else {
             0
         };
-        group_channel_id
+        Ok(group_channel_id)
     }
 }
 
@@ -335,7 +358,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         info!("Received OpenStandardMiningChannel message");
         let mut messages = Vec::new();
 
-        let client = self.get_client(client_id).await;
+        let client = self.get_client(client_id).await?;
 
         // Get extranonce prefix
         let extranonce_prefix = {
@@ -461,7 +484,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                 )));
             }
         };
-        let coinbase_output = self.get_coinbase_outputs().await;
+        let coinbase_output = self.get_coinbase_outputs().await?;
 
         // Call on_new_template before moving standard_channel
         standard_channel
@@ -475,7 +498,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
             })?;
 
         let (future_standard_job_id, future_job_message) =
-            self.get_future_job_message(&standard_channel).await;
+            self.get_future_job_message(&standard_channel).await?;
 
         let last_prev_hash = match self.get_last_prev_hash().await {
             Some(prev_hash) => prev_hash,
@@ -523,7 +546,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
 
         let group_channel_id = self
             .register_standard_channel(client_id, channel_id, standard_channel)
-            .await;
+            .await?;
 
         let open_standard_mining_channel_response = OpenStandardMiningChannelSuccess {
             request_id: m.request_id,
@@ -568,7 +591,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
 
         let mut messages = Vec::new();
 
-        let client = self.get_client(client_id).await;
+        let client = self.get_client(client_id).await?;
 
         let channel_id = {
             let client_guard = client.read().await;
@@ -585,7 +608,13 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                 .lock()
                 .await
                 .next_prefix_standard()
-                .expect("Could not get extranonce prefix")
+                .map_err(|e| {
+                    error!("Could not get extranonce prefix: {:?}", e);
+                    RequestToSv2ServerError::MiningHandlerError(format!(
+                        "Could not get extranonce prefix: {:?}",
+                        e
+                    ))
+                })?
                 .to_vec()
         };
 
@@ -680,15 +709,21 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                 )));
             }
         };
-        let coinbase_outputs = self.get_coinbase_outputs().await;
+        let coinbase_outputs = self.get_coinbase_outputs().await?;
 
         extended_channel
             .on_new_template(last_activated_future_template.clone(), coinbase_outputs)
-            .expect("Error processing new template on extended channel");
+            .map_err(|e| {
+                error!("Error processing new template on extended channel: {:?}", e);
+                RequestToSv2ServerError::MiningHandlerError(format!(
+                    "Error processing new template on extended channel: {:?}",
+                    e
+                ))
+            })?;
 
         let (future_job_id, future_job_message) = self
             .get_future_job_message_extended(&extended_channel)
-            .await;
+            .await?;
 
         let last_prev_hash = match self.get_last_prev_hash().await {
             Some(prev_hash) => prev_hash,
@@ -749,7 +784,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
 
         // Register the new extended channel
         self.register_extended_channel(client_id, channel_id, extended_channel)
-            .await;
+            .await?;
 
         {
             let mut state = self.shared_state.write().await;
@@ -770,7 +805,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         m: UpdateChannel<'static>,
     ) -> Result<ResponseFromSv2Server<'static>, RequestToSv2ServerError> {
         info!("Received UpdateChannel message");
-        let client = self.get_client(client_id).await;
+        let client = self.get_client(client_id).await?;
         let is_standard_channel = client
             .read()
             .await
