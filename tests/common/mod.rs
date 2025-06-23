@@ -5,6 +5,7 @@ use std::{
     str::FromStr,
     sync::Mutex,
 };
+use sv2_cpu_miner::config::Sv2CpuMinerConfig;
 
 use bitcoin::Address;
 use pleblottery::config::{
@@ -57,6 +58,9 @@ pub fn load_config() -> PleblotteryConfig {
             .unwrap()
             .assume_checked()
             .script_pubkey(),
+            coinbase_tag: "pleblottery".to_string(),
+            share_batch_size: 10,
+            expected_shares_per_minute: 1.0,
         },
         template_distribution_config: PlebLotteryTemplateDistributionClientConfig {
             server_addr: "127.0.0.1:8442".parse().expect("Invalid server address"),
@@ -65,5 +69,23 @@ pub fn load_config() -> PleblotteryConfig {
         web_config: PlebLotteryWebConfig {
             listening_port: web_server_available_addr.port(),
         },
+    }
+}
+
+pub fn load_miner_config() -> Sv2CpuMinerConfig {
+    Sv2CpuMinerConfig {
+        server_addr: "127.0.0.1:3333".parse().expect("Invalid server address"),
+        auth_pk: Some(
+            "9auqWEzQDVyd2oe1JVGFLMLHZtCo2FFqZwtKA5gd9xbuEu7PH72"
+                .parse()
+                .expect("Invalid public key"),
+        ),
+        n_extended_channels: 1,
+        n_standard_channels: 1,
+        user_identity: "username".to_string(),
+        device_id: "sv2-cpu-miner".to_string(),
+        single_submit: true,
+        cpu_usage_percent: 10,
+        nominal_hashrate_multiplier: 1.0,
     }
 }

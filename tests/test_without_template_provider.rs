@@ -25,10 +25,11 @@ async fn test_without_template_provider() {
     let shared_state: SharedStateHandle = SharedStateHandle::default();
 
     let mut pleblottery_service = PlebLotteryService::new(
-        config.mining_server_config.clone().into(),
-        config.template_distribution_config.clone().into(),
+        config.mining_server_config.clone(),
+        config.template_distribution_config.clone(),
         shared_state,
     )
+    .await
     .expect("Failed to create PlebLotteryService");
 
     let result = pleblottery_service.start().await;

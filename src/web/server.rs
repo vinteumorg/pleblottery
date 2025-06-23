@@ -2,6 +2,7 @@ use anyhow::Result;
 use axum::Router;
 use tokio::net::TcpListener;
 use tower_http::services::ServeDir;
+use tracing::info;
 
 use crate::config::PlebLotteryWebConfig;
 use crate::state::SharedStateHandle;
@@ -19,9 +20,12 @@ pub async fn start_web_server(
     let addr = format!("0.0.0.0:{}", web_config.listening_port);
     let listener = TcpListener::bind(&addr).await?;
 
-    tokio::spawn(async move {
-        axum::serve(listener, app).await.expect("axum serve failed");
-    });
+    info!(
+        "Web server started on http://localhost:{}",
+        web_config.listening_port
+    );
+
+    axum::serve(listener, app).await.expect("axum serve failed");
 
     Ok(())
 }

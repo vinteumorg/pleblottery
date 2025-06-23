@@ -81,21 +81,10 @@ pub async fn get_latest_template(State(shared_state): State<SharedStateHandle>) 
                 <td>{}</td>
             </tr>
             <tr>
-                <td>Version</td>
-                <td>{}</td>
-            </tr>
-            <tr>
-                <td>Coinbase Value</td>
+                <td>Template Revenue (Sats)</td>
                 <td>{}</td>
             </tr>"#,
-            template.template_id,
-            template
-                .version
-                .to_be_bytes()
-                .iter()
-                .map(|byte| format!("{:02x}", byte))
-                .collect::<String>(),
-            template.coinbase_tx_value_remaining as f64 / 100_000_000.0
+            template.template_id, template.coinbase_tx_value_remaining as f64
         );
         Html(rows)
     } else {
@@ -177,6 +166,116 @@ pub async fn get_latest_prev_hash(State(shared_state): State<SharedStateHandle>)
     Html(rows)
 }
 
+pub async fn get_mining_stats(State(shared_state): State<SharedStateHandle>) -> Html<String> {
+    let state = shared_state.read().await;
+    let mut rows = String::new();
+
+    if let Some(_) = &state.latest_prev_hash {
+        let hashrate_display = if state.total_clients == 0 {
+            "0.00 h/s".to_string()
+        } else {
+            state.format_hashrate()
+        };
+
+        rows.push_str(&format!(
+            r#"
+                <tr>
+                    <td>Total Clients</td>
+                    <td>{}</td>
+                </tr>
+                <tr>
+                    <td>Total shares</td>
+                    <td>{}</td>
+                </tr>
+                <tr>
+                    <td>Best Share</td>
+                    <td>{}</td>
+                </tr>
+                <tr>
+                    <td>Total Hashrate</td>
+                    <td>{}</td>
+                </tr>
+                <tr>
+                    <td>💰 Blocks Found 💰</td>
+                    <td>{}</td>
+                </tr>
+            "#,
+            state.total_clients,
+            state.total_shares_submitted,
+            state.format_best_share(),
+            hashrate_display,
+            state.blocks_found
+        ));
+    } else {
+        rows.push_str(
+            r#"<tr>
+                <td colspan="4">No mining stats available</td>
+            </tr>"#,
+        );
+    }
+
+    Html(rows)
+}
+
+pub async fn get_clients_stats(State(shared_state): State<SharedStateHandle>) -> Html<String> {
+    let state = shared_state.read().await;
+    let mut rows = String::new();
+
+    if state.clients.read().await.len() > 0 as usize {
+        let clients = state.clients.read().await;
+        for (_, client) in clients.iter() {
+            let client = client.read().await;
+            rows.push_str(&format!(
+                r#"
+                <div>
+                    <table class="tg">
+                        <thead>
+                            <tr>
+                                <th colspan="2">Client {}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Client ID</td>
+                                <td>{}</td>
+                            </tr>
+                            <tr>
+                                <td>Connection Flags</td>
+                                <td>{:04b}</td>
+                            </tr>
+                            <tr>
+                                <td>Group Channel</td>
+                                <td>{}</td>
+                            </tr>
+                            <tr>
+                                <td>Standard Channels</td>
+                                <td>{}</td>
+                            </tr>
+                            <tr>
+                                <td>Extended Channels</td>
+                                <td>{}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                "#,
+                client.client_id,
+                client.client_id,
+                client.connection_flags,
+                client
+                    .group_channel
+                    .is_some()
+                    .then(|| "Yes")
+                    .unwrap_or("No"),
+                client.standard_channels.read().await.len(),
+                client.extended_channels.read().await.len()
+            ));
+        }
+    }
+
+    Html(rows)
+}
+
 pub fn api_routes(shared_state: SharedStateHandle) -> Router {
     Router::new()
         .route("/api/config", axum::routing::get(serve_config_htmx))
@@ -188,5 +287,7 @@ pub fn api_routes(shared_state: SharedStateHandle) -> Router {
             "/api/latest-prev-hash",
             axum::routing::get(get_latest_prev_hash),
         )
+        .route("/api/mining-stats", axum::routing::get(get_mining_stats))
+        .route("/api/clients", axum::routing::get(get_clients_stats))
         .with_state(shared_state)
 }

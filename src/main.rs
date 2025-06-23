@@ -1,5 +1,5 @@
 use clap::Parser;
-use tracing::info;
+use tracing::{error, info};
 
 use pleblottery::cli;
 use pleblottery::config::PleblotteryConfig;
@@ -21,21 +21,28 @@ async fn main() -> anyhow::Result<()> {
     let shared_state: SharedStateHandle = SharedStateHandle::default();
 
     let mut pleblottery_service = PlebLotteryService::new(
-        config.mining_server_config.into(),
-        config.template_distribution_config.into(),
+        config.mining_server_config,
+        config.template_distribution_config,
         shared_state.clone(),
-    )?;
+    )
+    .await?;
 
-    pleblottery_service.start().await?;
-
-    start_web_server(&config.web_config, shared_state.clone()).await?;
-    info!(
-        "Web server started on http://localhost:{}",
-        config.web_config.listening_port
-    );
-
-    // Wait for Ctrl+C
-    tokio::signal::ctrl_c().await?;
+    // Use tokio::select to wait for either service completion or Ctrl+C
+    tokio::select! {
+        result = pleblottery_service.start() => {
+            if let Err(e) = result {
+                error!("Service failed to start: {}", e);
+            }
+        }
+        result = start_web_server(&config.web_config, shared_state.clone()) => {
+            if let Err(e) = result {
+                error!("Web server failed to start: {}", e);
+            }
+        }
+        _ = tokio::signal::ctrl_c() => {
+            tracing::info!("Received Ctrl+C, shutting down...");
+        }
+    }
 
     info!("Shutting down...");
 
