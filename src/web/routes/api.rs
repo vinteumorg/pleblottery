@@ -84,8 +84,7 @@ pub async fn get_latest_template(State(shared_state): State<SharedStateHandle>) 
                 <td>Template Revenue (Sats)</td>
                 <td>{}</td>
             </tr>"#,
-            template.template_id,
-            template.coinbase_tx_value_remaining as f64
+            template.template_id, template.coinbase_tx_value_remaining as f64
         );
         Html(rows)
     } else {
