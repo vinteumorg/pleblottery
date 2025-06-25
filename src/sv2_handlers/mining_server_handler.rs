@@ -25,7 +25,6 @@ use tower_stratum::roles_logic_sv2::parsers::{AnyMessage, Mining};
 use tower_stratum::roles_logic_sv2::template_distribution_sv2::{
     NewTemplate, SetNewPrevHash, SubmitSolution,
 };
-use tower_stratum::roles_logic_sv2::utils::Id as IdFactory;
 use tower_stratum::server::service::client::Sv2MessagesToClient;
 use tower_stratum::server::service::request::RequestToSv2Server;
 use tower_stratum::server::service::request::RequestToSv2ServerError;
@@ -36,6 +35,7 @@ use crate::state::SharedStateHandle;
 
 use bitcoin::{transaction::TxOut, Amount};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use tracing::{error, info};
@@ -44,7 +44,7 @@ use tracing::{error, info};
 pub struct PleblotteryMiningClient {
     pub client_id: u32,
     pub connection_flags: u32,
-    pub channel_id_factory: Arc<Mutex<IdFactory>>,
+    pub channel_id_factory: AtomicU32,
     pub group_channel: Option<Arc<RwLock<GroupChannel<'static>>>>, // only one group per client, all standard channels belong to it
     pub standard_channels: Arc<RwLock<HashMap<u32, Arc<RwLock<StandardChannel<'static>>>>>>,
     pub extended_channels: Arc<RwLock<HashMap<u32, Arc<RwLock<ExtendedChannel<'static>>>>>>,
@@ -272,7 +272,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
     async fn add_client(&mut self, client_id: u32, flags: u32) {
         info!("Adding client with id: {}, flags: {:04b}", client_id, flags);
 
-        let mut channel_id_factory = IdFactory::new();
+        let channel_id_factory = AtomicU32::new(1);
 
         let standard_channels = Arc::new(RwLock::new(HashMap::new()));
         let extended_channels = Arc::new(RwLock::new(HashMap::new()));
@@ -281,7 +281,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         let group_channel = if flags & 0x0001 == 0x0001 {
             None
         } else {
-            let group_channel_id = channel_id_factory.next();
+            let group_channel_id = channel_id_factory.fetch_add(1, Ordering::SeqCst);
             info!("Adding group channel with id: {}", group_channel_id);
             Some(Arc::new(RwLock::new(GroupChannel::new(group_channel_id))))
         };
@@ -289,7 +289,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         let client = PleblotteryMiningClient {
             client_id,
             connection_flags: flags,
-            channel_id_factory: Arc::new(Mutex::new(channel_id_factory)),
+            channel_id_factory,
             group_channel,
             standard_channels,
             extended_channels,
@@ -380,7 +380,9 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
 
         let channel_id = {
             let client_guard = client.read().await;
-            let channel_id = client_guard.channel_id_factory.lock().await.next();
+            let channel_id = client_guard
+                .channel_id_factory
+                .fetch_add(1, Ordering::SeqCst);
             channel_id
         };
 
@@ -595,7 +597,9 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
 
         let channel_id = {
             let client_guard = client.read().await;
-            let channel_id = client_guard.channel_id_factory.lock().await.next();
+            let channel_id = client_guard
+                .channel_id_factory
+                .fetch_add(1, Ordering::SeqCst);
             channel_id
         };
 
