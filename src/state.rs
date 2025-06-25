@@ -6,7 +6,7 @@ use tower_stratum::roles_logic_sv2::template_distribution_sv2::{NewTemplate, Set
 use crate::sv2_handlers::mining_server_handler::PleblotteryMiningClient;
 
 #[derive(Default, Debug, Clone)]
-/// Represents the shared state of the application, containing optional
+/// Represents the state of the application (shared with the web server), containing optional
 /// information about the latest template and the latest previous hash.
 pub struct SharedState {
     pub latest_template: Option<NewTemplate<'static>>,
