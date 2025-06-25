@@ -1,4 +1,4 @@
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use tower_stratum::client::service::request::RequestToSv2Client;
 use tower_stratum::client::service::subprotocols::template_distribution::trigger::TemplateDistributionClientTrigger;
 use tower_stratum::roles_logic_sv2::channels::server::error::ExtendedChannelError;
@@ -59,7 +59,7 @@ pub struct PlebLotteryMiningServerHandler {
     pub last_activated_future_template: Arc<RwLock<Option<NewTemplate<'static>>>>,
     pub last_prev_hash: Arc<RwLock<Option<SetNewPrevHash<'static>>>>,
     pub extranonce_prefix_factory_standard: Arc<RwLock<ExtendedExtranonce>>,
-    pub extranonce_prefix_factory_extended: Arc<Mutex<ExtendedExtranonce>>,
+    pub extranonce_prefix_factory_extended: Arc<RwLock<ExtendedExtranonce>>,
     pub share_batch_size: usize,
     pub expected_shares_per_minute: f32,
 }
@@ -103,7 +103,7 @@ impl PlebLotteryMiningServerHandler {
                 )
                 .expect("valid ExtendedExtranonce must not fail"),
             )),
-            extranonce_prefix_factory_extended: Arc::new(Mutex::new(
+            extranonce_prefix_factory_extended: Arc::new(RwLock::new(
                 ExtendedExtranonce::new(
                     range_0,
                     range_1,
@@ -609,7 +609,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
 
         let extranonce_prefix = {
             self.extranonce_prefix_factory_extended
-                .lock()
+                .write()
                 .await
                 .next_prefix_standard()
                 .map_err(|e| {
