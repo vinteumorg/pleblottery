@@ -5,6 +5,7 @@ use tower_stratum::roles_logic_sv2::channels::server::error::ExtendedChannelErro
 use tower_stratum::roles_logic_sv2::channels::server::error::StandardChannelError;
 use tower_stratum::roles_logic_sv2::channels::server::extended::ExtendedChannel;
 use tower_stratum::roles_logic_sv2::channels::server::group::GroupChannel;
+use tower_stratum::roles_logic_sv2::channels::server::jobs::job_store::DefaultJobStore;
 use tower_stratum::roles_logic_sv2::channels::server::share_accounting::{
     ShareValidationError, ShareValidationResult,
 };
@@ -283,7 +284,11 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         } else {
             let group_channel_id = channel_id_factory.fetch_add(1, Ordering::SeqCst);
             info!("Adding group channel with id: {}", group_channel_id);
-            Some(Arc::new(RwLock::new(GroupChannel::new(group_channel_id))))
+            let job_store = Box::new(DefaultJobStore::new());
+            Some(Arc::new(RwLock::new(GroupChannel::new(
+                group_channel_id,
+                job_store,
+            ))))
         };
 
         let client = PleblotteryMiningClient {
@@ -348,8 +353,6 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         Ok(ResponseFromSv2Server::Ok)
     }
 
-    async fn shutdown(&mut self) {}
-
     async fn handle_open_standard_mining_channel(
         &self,
         client_id: u32,
@@ -400,6 +403,8 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         let max_target = m.max_target.clone();
 
         // Create standard channel
+        let job_store = Box::new(DefaultJobStore::new());
+
         let mut standard_channel = match StandardChannel::new(
             channel_id,
             user_identity,
@@ -408,6 +413,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
             m.nominal_hash_rate,
             self.share_batch_size,
             self.expected_shares_per_minute,
+            job_store,
         ) {
             Ok(channel) => channel,
             Err(e) => match e {
@@ -622,6 +628,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
                 .to_vec()
         };
 
+        let job_store = Box::new(DefaultJobStore::new());
         let mut extended_channel = match ExtendedChannel::new(
             channel_id,
             user_identity,
@@ -632,6 +639,7 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
             m.min_extranonce_size,
             self.share_batch_size,
             self.expected_shares_per_minute,
+            job_store,
         ) {
             Ok(channel) => channel,
             Err(e) => match e {
