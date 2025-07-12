@@ -27,8 +27,8 @@ axum-htmx = "0.7.0"
 bitcoin = "0.32.6"
 
 [dev-dependencies]
-integration_tests_sv2 = { git = "https://github.com/stratum-mining/stratum", branch = "main" }
-binary_codec_sv2 = { git = "https://github.com/stratum-mining/stratum", branch = "main" }
+integration_tests_sv2 = { git = "https://github.com/stratum-mining/stratum", branch = "v1.4.0" }
+binary_codec_sv2 = { git = "https://github.com/stratum-mining/stratum", branch = "v1.4.0" }
 once_cell = "1.21.3"
 reqwest = "0.12.15"
 sv2-cpu-miner = { git = "https://github.com/plebhash/sv2-cpu-miner.git", branch = "main" }
