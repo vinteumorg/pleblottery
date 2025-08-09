@@ -3,11 +3,11 @@ use integration_tests_sv2::{interceptor, start_sniffer, start_template_provider}
 use pleblottery::web::server::start_web_server;
 use pleblottery::{service::PlebLotteryService, state::SharedStateHandle};
 use reqwest::Client;
-use tower_stratum::roles_logic_sv2::template_distribution_sv2::MESSAGE_TYPE_NEW_TEMPLATE;
+use sv2_services::roles_logic_sv2::template_distribution_sv2::MESSAGE_TYPE_NEW_TEMPLATE;
 mod common;
 use common::load_config;
-use tower_stratum::roles_logic_sv2::parsers::IsSv2Message;
-use tower_stratum::roles_logic_sv2::template_distribution_sv2::SetNewPrevHash;
+use sv2_services::roles_logic_sv2::parsers::IsSv2Message;
+use sv2_services::roles_logic_sv2::template_distribution_sv2::SetNewPrevHash;
 
 /// Integration test to verify that the shared state between the PlebLotteryService
 /// and the web server works as expected.

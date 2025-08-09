@@ -72,6 +72,7 @@ pub fn load_config() -> PleblotteryConfig {
     }
 }
 
+#[allow(dead_code)]
 pub fn load_miner_config() -> Sv2CpuMinerConfig {
     Sv2CpuMinerConfig {
         server_addr: "127.0.0.1:3333".parse().expect("Invalid server address"),

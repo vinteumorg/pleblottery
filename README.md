@@ -16,7 +16,7 @@ the idea is similar to [`public-pool`](https://github.com/benjamin-wilson/public
 
 the coinbase payout goes to one single output, **without any kind of pooled reward distribution**.
 
-`pleblottery` builds on top of [`tower-stratum`](https://github.com/plebhash/tower-stratum) and [Stratum V2 Reference Implementation](https://github.com/stratum-mining/stratum).
+`pleblottery` builds on top of [`sv2-services`](https://github.com/plebhash/sv2-services) and [Stratum V2 Reference Implementation](https://github.com/stratum-mining/stratum).
 
 
 <h1 align="center">

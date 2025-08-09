@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
+use sv2_services::roles_logic_sv2::template_distribution_sv2::{NewTemplate, SetNewPrevHash};
 use tokio::sync::RwLock;
-use tower_stratum::roles_logic_sv2::template_distribution_sv2::{NewTemplate, SetNewPrevHash};
 
 use crate::sv2_handlers::mining_server_handler::PleblotteryMiningClient;
 

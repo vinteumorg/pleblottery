@@ -4,12 +4,13 @@ use crate::state::SharedStateHandle;
 use crate::sv2_handlers::mining_server_handler::PlebLotteryMiningServerHandler;
 use crate::sv2_handlers::template_distribution_client_handler::PlebLotteryTemplateDistributionClientHandler;
 use anyhow::{anyhow, Result};
+use sv2_services::client::service::config::Sv2ClientServiceConfig;
+use sv2_services::client::service::subprotocols::mining::handler::NullSv2MiningClientHandler;
+use sv2_services::client::service::Sv2ClientService;
+use sv2_services::server::service::config::Sv2ServerServiceConfig;
+use sv2_services::server::service::Sv2ServerService;
+use sv2_services::Sv2Service;
 use tokio_util::sync::CancellationToken;
-use tower_stratum::client::service::config::Sv2ClientServiceConfig;
-use tower_stratum::client::service::subprotocols::mining::handler::NullSv2MiningClientHandler;
-use tower_stratum::client::service::Sv2ClientService;
-use tower_stratum::server::service::config::Sv2ServerServiceConfig;
-use tower_stratum::server::service::Sv2ServerService;
 
 use tracing::debug;
 

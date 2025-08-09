@@ -4,13 +4,13 @@ use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::Path;
 use std::str::FromStr;
-use tower_stratum::client::service::config::Sv2ClientServiceConfig;
-use tower_stratum::client::service::config::Sv2ClientServiceTemplateDistributionConfig;
-use tower_stratum::key_utils::Secp256k1PublicKey;
-use tower_stratum::key_utils::Secp256k1SecretKey;
-use tower_stratum::server::service::config::Sv2ServerServiceConfig;
-use tower_stratum::server::service::config::Sv2ServerServiceMiningConfig;
-use tower_stratum::server::service::config::Sv2ServerTcpConfig;
+use sv2_services::client::service::config::Sv2ClientServiceConfig;
+use sv2_services::client::service::config::Sv2ClientServiceTemplateDistributionConfig;
+use sv2_services::key_utils::Secp256k1PublicKey;
+use sv2_services::key_utils::Secp256k1SecretKey;
+use sv2_services::server::service::config::Sv2ServerServiceConfig;
+use sv2_services::server::service::config::Sv2ServerServiceMiningConfig;
+use sv2_services::server::service::config::Sv2ServerTcpConfig;
 #[derive(Clone, Debug)]
 pub struct PlebLotteryMiningServerConfig {
     pub listening_port: u16,

@@ -7,7 +7,7 @@ inactivity_limit = 3600
 coinbase_output_address = "tb1qw8rnkgnk7s48h6w5c0mg7we7gvzykeyp2sze82"
 coinbase_tag = "username"
 share_batch_size = 10
-expected_shares_per_minute = 10.0
+expected_shares_per_minute = 1000.0
 
 [template_distribution_config]
 server_addr = "127.0.0.1:8442"

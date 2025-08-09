@@ -1,17 +1,16 @@
 use anyhow::Result;
-use tower_stratum::client::service::request::{RequestToSv2Client, RequestToSv2ClientError};
-use tower_stratum::client::service::response::ResponseFromSv2Client;
-use tower_stratum::client::service::subprotocols::template_distribution::handler::Sv2TemplateDistributionClientHandler;
-use tower_stratum::client::service::subprotocols::template_distribution::trigger::TemplateDistributionClientTrigger;
-use tower_stratum::roles_logic_sv2::template_distribution_sv2::{
+use sv2_services::client::service::event::{Sv2ClientEvent, Sv2ClientEventError};
+use sv2_services::client::service::outcome::Sv2ClientOutcome;
+use sv2_services::client::service::subprotocols::template_distribution::handler::Sv2TemplateDistributionClientHandler;
+use sv2_services::client::service::subprotocols::template_distribution::trigger::TemplateDistributionClientTrigger;
+use sv2_services::roles_logic_sv2::template_distribution_sv2::{
     NewTemplate, RequestTransactionDataError, RequestTransactionDataSuccess, SetNewPrevHash,
 };
-use tower_stratum::server::service::request::RequestToSv2Server;
-use tower_stratum::server::service::subprotocols::mining::trigger::MiningServerTrigger;
-use tracing::info;
+use sv2_services::server::service::event::Sv2ServerEvent;
+use sv2_services::server::service::subprotocols::mining::trigger::MiningServerTrigger;
+use tracing::{error, info};
 
 use std::sync::Arc;
-use std::task::{Context, Poll};
 use tokio::sync::RwLock;
 
 use crate::utils::bip34_block_height;
@@ -37,13 +36,9 @@ impl PlebLotteryTemplateDistributionClientHandler {
 }
 
 impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionClientHandler {
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), RequestToSv2ClientError>> {
-        Poll::Ready(Ok(()))
-    }
-
-    async fn start(&mut self) -> Result<ResponseFromSv2Client<'static>, RequestToSv2ClientError> {
-        Ok(ResponseFromSv2Client::TriggerNewRequest(Box::new(
-            RequestToSv2Client::TemplateDistributionTrigger(
+    async fn start(&mut self) -> Result<Sv2ClientOutcome<'static>, Sv2ClientEventError> {
+        Ok(Sv2ClientOutcome::TriggerNewEvent(Box::new(
+            Sv2ClientEvent::TemplateDistributionTrigger(
                 TemplateDistributionClientTrigger::SetCoinbaseOutputConstraints(
                     self.coinbase_output_max_additional_size,
                     self.coinbase_output_max_additional_sigops,
@@ -55,7 +50,7 @@ impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionCli
     async fn handle_new_template(
         &self,
         template: NewTemplate<'static>,
-    ) -> Result<ResponseFromSv2Client<'static>, RequestToSv2ClientError> {
+    ) -> Result<Sv2ClientOutcome<'static>, Sv2ClientEventError> {
         let current_height = match bip34_block_height(&template.coinbase_prefix.to_vec()) {
             Ok(height) => height.checked_sub(1).unwrap_or(0), // Subtract 1 to get the **current** height
             Err(_) => 0,
@@ -69,37 +64,39 @@ impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionCli
             }
         }
 
-        let response = ResponseFromSv2Client::TriggerNewRequest(Box::new(
-            RequestToSv2Client::SendRequestToSiblingServerService(Box::new(
-                RequestToSv2Server::MiningTrigger(MiningServerTrigger::NewTemplate(template)),
+        let outcome = Sv2ClientOutcome::TriggerNewEvent(Box::new(
+            Sv2ClientEvent::SendEventToSiblingServerService(Box::new(
+                Sv2ServerEvent::MiningTrigger(MiningServerTrigger::NewTemplate(template)),
             )),
         ));
-        Ok(response)
+        Ok(outcome)
     }
 
     async fn handle_set_new_prev_hash(
         &self,
         prev_hash: SetNewPrevHash<'static>,
-    ) -> Result<ResponseFromSv2Client<'static>, RequestToSv2ClientError> {
-        let response = ResponseFromSv2Client::TriggerNewRequest(Box::new(
-            RequestToSv2Client::SendRequestToSiblingServerService(Box::new(
-                RequestToSv2Server::MiningTrigger(MiningServerTrigger::SetNewPrevHash(prev_hash)),
+    ) -> Result<Sv2ClientOutcome<'static>, Sv2ClientEventError> {
+        let outcome = Sv2ClientOutcome::TriggerNewEvent(Box::new(
+            Sv2ClientEvent::SendEventToSiblingServerService(Box::new(
+                Sv2ServerEvent::MiningTrigger(MiningServerTrigger::SetNewPrevHash(prev_hash)),
             )),
         ));
-        Ok(response)
+        Ok(outcome)
     }
 
     async fn handle_request_transaction_data_success(
         &self,
         _transaction_data: RequestTransactionDataSuccess<'static>,
-    ) -> Result<ResponseFromSv2Client<'static>, RequestToSv2ClientError> {
-        unimplemented!("handle_request_transaction_data_success should not be called");
+    ) -> Result<Sv2ClientOutcome<'static>, Sv2ClientEventError> {
+        error!("Received unexpected RequestTransactionDataSuccess");
+        Err(Sv2ClientEventError::UnsupportedMessage)
     }
 
     async fn handle_request_transaction_data_error(
         &self,
         _error: RequestTransactionDataError<'static>,
-    ) -> Result<ResponseFromSv2Client<'static>, RequestToSv2ClientError> {
-        unimplemented!("handle_request_transaction_data_error should not be called");
+    ) -> Result<Sv2ClientOutcome<'static>, Sv2ClientEventError> {
+        error!("Received unexpected RequestTransactionDataError");
+        Err(Sv2ClientEventError::UnsupportedMessage)
     }
 }

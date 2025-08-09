@@ -2,7 +2,7 @@ use std::vec;
 
 use integration_tests_sv2::*;
 use pleblottery::{service::PlebLotteryService, state::SharedStateHandle};
-use tower_stratum::roles_logic_sv2::{
+use sv2_services::roles_logic_sv2::{
     common_messages_sv2::{MESSAGE_TYPE_SETUP_CONNECTION, MESSAGE_TYPE_SETUP_CONNECTION_SUCCESS},
     mining_sv2::{
         MESSAGE_TYPE_MINING_SET_NEW_PREV_HASH, MESSAGE_TYPE_NEW_EXTENDED_MINING_JOB,
