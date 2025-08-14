@@ -307,7 +307,16 @@ impl Sv2MiningServerHandler for PlebLotteryMiningServerHandler {
         let hashrate = {
             let mut hash = 0.0;
             let clients_guard = self.clients.read().await;
-            let client = clients_guard.get(&client_id).unwrap();
+            let client = match clients_guard.get(&client_id) {
+                Some(c) => c,
+                None => {
+                    info!(
+                        "Client {} not found in clients list — assuming already dropped.",
+                        client_id
+                    );
+                    return;
+                }
+            };
             let client_guard = client.read().await;
 
             // Calculate hashrate from standard channels
