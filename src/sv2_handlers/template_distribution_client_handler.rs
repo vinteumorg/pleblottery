@@ -51,6 +51,10 @@ impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionCli
         &self,
         template: NewTemplate<'static>,
     ) -> Result<Sv2ClientOutcome<'static>, Sv2ClientEventError> {
+        info!(
+            "Received NewTemplate message from Template Provider: {}",
+            template
+        );
         let current_height = match bip34_block_height(&template.coinbase_prefix.to_vec()) {
             Ok(height) => height.checked_sub(1).unwrap_or(0), // Subtract 1 to get the **current** height
             Err(_) => 0,
@@ -76,6 +80,10 @@ impl Sv2TemplateDistributionClientHandler for PlebLotteryTemplateDistributionCli
         &self,
         prev_hash: SetNewPrevHash<'static>,
     ) -> Result<Sv2ClientOutcome<'static>, Sv2ClientEventError> {
+        info!(
+            "Received SetNewPrevHash message from Template Provider: {}",
+            prev_hash
+        );
         let outcome = Sv2ClientOutcome::TriggerNewEvent(Box::new(
             Sv2ClientEvent::SendEventToSiblingServerService(Box::new(
                 Sv2ServerEvent::MiningTrigger(MiningServerTrigger::SetNewPrevHash(prev_hash)),
