@@ -1,4 +1,6 @@
-use bitcoin::Address;
+use bitcoin::blockdata::locktime::absolute::LockTime;
+use bitcoin::transaction::Version;
+use bitcoin::{Address, Amount, OutPoint, ScriptBuf, Sequence, Transaction, TxIn, TxOut, Witness};
 use serde::{Deserialize, Deserializer};
 use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -11,6 +13,32 @@ use sv2_services::key_utils::Secp256k1SecretKey;
 use sv2_services::server::service::config::Sv2ServerServiceConfig;
 use sv2_services::server::service::config::Sv2ServerServiceMiningConfig;
 use sv2_services::server::service::config::Sv2ServerTcpConfig;
+
+// =====================
+// PleblotteryConfig
+// =====================
+#[derive(Clone, Deserialize, Debug)]
+pub struct PleblotteryConfig {
+    pub mining_server_config: PlebLotteryMiningServerConfig,
+    pub template_distribution_config: PlebLotteryTemplateDistributionClientConfig,
+    pub web_config: PlebLotteryWebConfig,
+}
+
+impl PleblotteryConfig {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
+        let contents = fs::read_to_string(path)
+            .map_err(|e| anyhow::anyhow!("Failed to read config file: {}", e))?;
+        let mut config: Self = toml::from_str(&contents)
+            .map_err(|e| anyhow::anyhow!("Failed to parse config file: {}", e))?;
+        config.template_distribution_config.mining_server_config =
+            Some(config.mining_server_config.clone());
+        Ok(config)
+    }
+}
+
+// =====================
+// PlebLotteryMiningServerConfig
+// =====================
 #[derive(Clone, Debug)]
 pub struct PlebLotteryMiningServerConfig {
     pub listening_port: u16,
@@ -22,6 +50,33 @@ pub struct PlebLotteryMiningServerConfig {
     pub coinbase_tag: String,
     pub share_batch_size: usize,
     pub expected_shares_per_minute: f32,
+}
+
+impl PlebLotteryMiningServerConfig {
+    // Returns a tuple with (coinbase_output_max_additional_size, coinbase_output_max_additional_sigops).
+    pub fn calculate_coinbase_output_constraints(&self) -> (u32, u16) {
+        let txout = TxOut {
+            value: Amount::ZERO,
+            script_pubkey: self.coinbase_output_script.clone(),
+        };
+
+        let dummy_transaction = Transaction {
+            version: Version::TWO,
+            lock_time: LockTime::ZERO,
+            input: vec![TxIn {
+                previous_output: OutPoint::null(),
+                script_sig: ScriptBuf::new(),
+                sequence: Sequence::MAX,
+                witness: Witness::from(vec![vec![0; 32]]),
+            }],
+            output: vec![txout.clone()],
+        };
+
+        (
+            txout.size() as u32,
+            dummy_transaction.total_sigop_cost(|_| None) as u16,
+        )
+    }
 }
 
 impl<'de> Deserialize<'de> for PlebLotteryMiningServerConfig {
@@ -68,34 +123,6 @@ impl<'de> Deserialize<'de> for PlebLotteryMiningServerConfig {
     }
 }
 
-#[derive(Clone, Deserialize, Debug)]
-pub struct PlebLotteryTemplateDistributionClientConfig {
-    pub server_addr: SocketAddr,
-    pub auth_pk: Option<Secp256k1PublicKey>,
-}
-
-#[derive(Clone, Deserialize, Debug)]
-pub struct PlebLotteryWebConfig {
-    pub listening_port: u16,
-}
-
-#[derive(Clone, Deserialize, Debug)]
-pub struct PleblotteryConfig {
-    pub mining_server_config: PlebLotteryMiningServerConfig,
-    pub template_distribution_config: PlebLotteryTemplateDistributionClientConfig,
-    pub web_config: PlebLotteryWebConfig,
-}
-
-impl PleblotteryConfig {
-    pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
-        let contents = fs::read_to_string(path)
-            .map_err(|e| anyhow::anyhow!("Failed to read config file: {}", e))?;
-        let config: Self = toml::from_str(&contents)
-            .map_err(|e| anyhow::anyhow!("Failed to parse config file: {}", e))?;
-        Ok(config)
-    }
-}
-
 impl From<PlebLotteryMiningServerConfig> for Sv2ServerServiceConfig {
     fn from(config: PlebLotteryMiningServerConfig) -> Self {
         Sv2ServerServiceConfig {
@@ -120,6 +147,40 @@ impl From<PlebLotteryMiningServerConfig> for Sv2ServerServiceConfig {
     }
 }
 
+// =====================
+// PlebLotteryTemplateDistributionClientConfig
+// =====================
+#[derive(Clone, Debug)]
+pub struct PlebLotteryTemplateDistributionClientConfig {
+    pub server_addr: SocketAddr,
+    pub auth_pk: Option<Secp256k1PublicKey>,
+    pub mining_server_config: Option<PlebLotteryMiningServerConfig>,
+}
+
+impl<'de> serde::Deserialize<'de> for PlebLotteryTemplateDistributionClientConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        struct Helper {
+            server_addr: SocketAddr,
+            auth_pk: Option<Secp256k1PublicKey>,
+        }
+        let helper = Helper::deserialize(deserializer).map_err(|e| {
+            serde::de::Error::custom(format!(
+                "Failed while parsing [template_distribution_config] section: {e}"
+            ))
+        })?;
+
+        Ok(PlebLotteryTemplateDistributionClientConfig {
+            auth_pk: helper.auth_pk,
+            server_addr: helper.server_addr,
+            mining_server_config: None,
+        })
+    }
+}
+
 impl From<PlebLotteryTemplateDistributionClientConfig> for Sv2ClientServiceConfig {
     fn from(config: PlebLotteryTemplateDistributionClientConfig) -> Self {
         Sv2ClientServiceConfig {
@@ -136,13 +197,27 @@ impl From<PlebLotteryTemplateDistributionClientConfig> for Sv2ClientServiceConfi
             template_distribution_config: Some(Sv2ClientServiceTemplateDistributionConfig {
                 server_addr: config.server_addr,
                 auth_pk: config.auth_pk,
-                coinbase_output_constraints: (1, 1), // todo: fix this
+                coinbase_output_constraints: config
+                    .mining_server_config
+                    .unwrap()
+                    .calculate_coinbase_output_constraints(),
                 setup_connection_flags: 0,
             }),
         }
     }
 }
 
+// =====================
+// PlebLotteryWebConfig
+// =====================
+#[derive(Clone, Deserialize, Debug)]
+pub struct PlebLotteryWebConfig {
+    pub listening_port: u16,
+}
+
+// =====================
+// Tests
+// =====================
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237,5 +312,31 @@ mod tests {
     fn test_coinbase_script_invalid_address_error() {
         let result = std::panic::catch_unwind(|| make_config("this_is_not_a_valid_address"));
         assert!(result.is_err(), "Expected panic for invalid address");
+    }
+    #[test]
+    fn test_calculate_coinbase_output_constraints() {
+        // P2PKH address
+        let config = make_config("1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa");
+        let (size, sigops) = config.calculate_coinbase_output_constraints();
+        assert_eq!(size, 34);
+        assert_eq!(sigops, 4);
+
+        // P2SH address
+        let config = make_config("3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy");
+        let (size, sigops) = config.calculate_coinbase_output_constraints();
+        assert_eq!(size, 32);
+        assert_eq!(sigops, 0);
+
+        // P2WPKH address
+        let config = make_config("bc1qryhgpmfv03qjhhp2dj8nw8g4ewg08jzmgy3cyx");
+        let (size, sigops) = config.calculate_coinbase_output_constraints();
+        assert_eq!(size, 31);
+        assert_eq!(sigops, 0);
+
+        // Taproot address
+        let config = make_config("bc1p2m7q0yn78rjqh200dz0kut5xcxdnfxk4wcsau7zydnrv9ns875eq37vmkz");
+        let (size, sigops) = config.calculate_coinbase_output_constraints();
+        assert_eq!(size, 43);
+        assert_eq!(sigops, 0);
     }
 }
